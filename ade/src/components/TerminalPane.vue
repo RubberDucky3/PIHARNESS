@@ -86,16 +86,12 @@ onMounted(async () => {
   fitAddon.fit()
 
   // Subscribe BEFORE spawning the PTY so no early output is lost.
-  unlisten = await listen('terminal-output', (event) => {
-    const payload = event.payload
-    if (!payload || payload.id !== props.terminalId) return
-    if (payload.data === null) {
-      if (term) term.write('\r\n\x1b[33m[Session ended]\x1b[0m')
-      emit('closed')
-      return
-    }
-    if (term) term.write(payload.data)
-  })
+  try {
+    unlisten = await doListen()
+  } catch (e) {
+    term.writeln('\x1b[31mTerminal backend unavailable (not running inside Tauri?)\x1b[0m')
+    return
+  }
 
   await safeInvoke('create_terminal', {
     id: props.terminalId,
@@ -113,6 +109,19 @@ onMounted(async () => {
   resizeObserver = new ResizeObserver(scheduleFit)
   resizeObserver.observe(terminalRef.value)
 })
+
+function doListen() {
+  return listen('terminal-output', (event) => {
+    const payload = event.payload
+    if (!payload || payload.id !== props.terminalId) return
+    if (payload.data === null) {
+      if (term) term.write('\r\n\x1b[33m[Session ended]\x1b[0m')
+      emit('closed')
+      return
+    }
+    if (term) term.write(payload.data)
+  })
+}
 
 onUnmounted(async () => {
   if (resizeTimer) clearTimeout(resizeTimer)
