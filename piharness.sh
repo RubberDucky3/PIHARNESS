@@ -147,6 +147,43 @@ _break_pane() {
   sleep 1
 }
 
+# Auto-detect and launch the best free interactive CLI in a pane.
+# Tries pi first (free), then opencode; skips types not installed.
+_autostart_runtime() {
+  local surface="$1"
+  local entry chain_type model
+  while IFS= read -r entry; do
+    chain_type=$(_rt_type "$entry")
+    model=$(_rt_model "$entry")
+    if [[ "$chain_type" == "pi" ]] && command -v pi &>/dev/null; then
+      cmux send --surface "$surface" "pi --model $(printf '%q' "$model")"$'\n' >/dev/null
+      _log "$surface" "AUTOSTART" "runtime=pi:$model"
+      return 0
+    elif [[ "$chain_type" == "opencode" ]] && command -v opencode &>/dev/null; then
+      cmux send --surface "$surface" "opencode ."$'\n' >/dev/null
+      _log "$surface" "AUTOSTART" "runtime=opencode:$model"
+      return 0
+    fi
+  done < <(echo "$RUNTIME_CHAIN" | tr ',' '\n')
+  _log "$surface" "AUTOSTART_SKIP" "no compatible free CLI found in PATH"
+}
+
+# Build the interactive restart command for the first available free runtime.
+_restart_cmd() {
+  local entry chain_type model
+  while IFS= read -r entry; do
+    chain_type=$(_rt_type "$entry")
+    model=$(_rt_model "$entry")
+    if [[ "$chain_type" == "pi" ]] && command -v pi &>/dev/null; then
+      printf '%s' "pi --model $(printf '%q' "$model")"
+      return 0
+    elif [[ "$chain_type" == "opencode" ]] && command -v opencode &>/dev/null; then
+      printf '%s' "opencode ."
+      return 0
+    fi
+  done < <(echo "$RUNTIME_CHAIN" | tr ',' '\n')
+}
+
 # ── commands ──────────────────────────────────────────────────────────────────
 
 case "$cmd" in
@@ -201,6 +238,7 @@ case "$cmd" in
     fi
 
     cmux send --surface "$surface" "cd $(printf '%q' "$cwd")"$'\n' >/dev/null
+    _autostart_runtime "$surface"
     echo "$surface" > "$LAST_SURFACE_FILE"
 
     start_epoch=$(date +%s)
@@ -293,12 +331,16 @@ case "$cmd" in
 
     runtime_cmd=$(_rt_cmd "$entry" "$tmpfile" "$outfile" "$wt")
 
-    # Build post-run: mark errors, auto-commit if worktree, mark done
+    # Break out of any interactive CLI session before running non-interactive task
+    _break_pane "$surface"
+
+    # Build post-run: mark errors, auto-commit if worktree, mark done, relaunch CLI
     error_check="if grep -qiE 'token limit|rate limit|quota|Error: Model stopped|context length' $(printf '%q' "$outfile") 2>/dev/null; then echo '__PIHARNESS_ERROR__' >> $(printf '%q' "$outfile"); fi"
     git_commit=""
     [[ -n "$wt" ]] && git_commit="git -C $(printf '%q' "$wt") add -A 2>/dev/null; git -C $(printf '%q' "$wt") commit -m 'feat: task output' --allow-empty 2>/dev/null; "
+    relaunch=$(_restart_cmd)
 
-    full_cmd="${runtime_cmd}; ${error_check}; ${git_commit}echo '__PIHARNESS_DONE__' >> $(printf '%q' "$outfile"); rm -f $(printf '%q' "$tmpfile")"
+    full_cmd="${runtime_cmd}; ${error_check}; ${git_commit}echo '__PIHARNESS_DONE__' >> $(printf '%q' "$outfile"); rm -f $(printf '%q' "$tmpfile")${relaunch:+; $relaunch}"
 
     cmux send --surface "$surface" "$full_cmd"$'\n' >/dev/null
     _log "$surface" "TASK_SENT" "runtime=$entry prompt=${prompt:0:100}"
