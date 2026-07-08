@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PIHARNESS — Pi Worker Orchestrator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+    .gradient-bg {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0ea5e9 100%);
+    }
+    .skill-card { transition: transform 0.2s, box-shadow 0.2s; }
+    .skill-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(14,165,233,0.15); }
+    .cmd-code { background: #0f172a; border: 1px solid #1e293b; }
+    .section-link { scroll-margin-top: 80px; }
+    .workflow-arrow { color: #0ea5e9; font-weight: 700; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-300">
+  <!-- Nav -->
+  <nav class="fixed top-0 w-full bg-slate-950/90 backdrop-blur border-b border-slate-800 z-50">
+    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center gap-6 text-sm">
+      <span class="font-bold text-white tracking-tight">PIHARNESS</span>
+      <a href="#overview" class="hover:text-white transition-colors">Overview</a>
+      <a href="#commands" class="hover:text-white transition-colors">Commands</a>
+      <a href="#workflow" class="hover:text-white transition-colors">Workflow</a>
+      <a href="#skills" class="hover:text-white transition-colors">Skills</a>
+      <a href="#pipeline" class="hover:text-white transition-colors">Pipeline</a>
+      <a href="#env" class="hover:text-white transition-colors">Config</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="gradient-bg pt-24 pb-20 px-6">
+    <div class="max-w-4xl mx-auto text-center">
+      <h1 class="text-5xl font-bold text-white mb-4 tracking-tight">PIHARNESS</h1>
+      <p class="text-xl text-slate-300 mb-3">Pi Worker Orchestrator for Claude Code</p>
+      <p class="text-slate-400 max-w-2xl mx-auto mb-8">
+        Spawn Pi workers, send tasks, collect output, compare results, and auto-learn
+        from repetitive patterns — all from cmux panes alongside your orchestrator session.
+      </p>
+      <div class="flex gap-3 justify-center flex-wrap">
+        <code class="cmd-code rounded-lg px-4 py-2 text-sm text-sky-300">./piharness.sh spawn --label worker-a</code>
+        <code class="cmd-code rounded-lg px-4 py-2 text-sm text-sky-300">./piharness.sh task surface:5 "build X"</code>
+        <code class="cmd-code rounded-lg px-4 py-2 text-sm text-sky-300">./piharness.sh skill list</code>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-6 py-12 space-y-20">
+
+    <!-- Overview -->
+    <section id="overview" class="section-link">
+      <h2 class="text-2xl font-bold text-white mb-6">What is PIHARNESS?</h2>
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800 space-y-4">
+        <p>PIHARNESS is a <strong class="text-white">bash-based worker orchestration harness</strong> that runs alongside your Claude Code session in cmux. It manages Pi worker panes so the orchestrator never writes code directly.</p>
+        <div class="grid md:grid-cols-3 gap-4 mt-6">
+          <div class="bg-slate-800/50 rounded-lg p-4">
+            <div class="text-sky-400 font-semibold text-lg mb-1">Plan</div>
+            <p class="text-sm text-slate-400">Break work into parallel slices</p>
+          </div>
+          <div class="bg-slate-800/50 rounded-lg p-4">
+            <div class="text-emerald-400 font-semibold text-lg mb-1">Execute</div>
+            <p class="text-sm text-slate-400">Spawn workers, send tasks in parallel</p>
+          </div>
+          <div class="bg-slate-800/50 rounded-lg p-4">
+            <div class="text-purple-400 font-semibold text-lg mb-1">Learn</div>
+            <p class="text-sm text-slate-400">Auto-detect patterns, extract skills</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Core Workflow -->
+    <section id="workflow" class="section-link">
+      <h2 class="text-2xl font-bold text-white mb-6">Core Workflow</h2>
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <div class="flex items-center gap-3 text-sm flex-wrap mb-8">
+          <span class="bg-sky-500/20 text-sky-300 px-3 py-1 rounded-full">1. PLAN</span>
+          <span class="workflow-arrow">→</span>
+          <span class="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full">2. SPAWN</span>
+          <span class="workflow-arrow">→</span>
+          <span class="bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full">3. TASK</span>
+          <span class="workflow-arrow">→</span>
+          <span class="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full">4. WAIT</span>
+          <span class="workflow-arrow">→</span>
+          <span class="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full">5. COLLECT</span>
+          <span class="workflow-arrow">→</span>
+          <span class="bg-rose-500/20 text-rose-300 px-3 py-1 rounded-full">6. COMMIT</span>
+        </div>
+        <pre class="text-sm text-slate-300 leading-relaxed"><span class="text-slate-500"># 1. Check current state</span>
+./piharness.sh status
+
+<span class="text-slate-500"># 2. Spawn workers in parallel (max 3)</span>
+./piharness.sh spawn --label impl-structure --worktree
+./piharness.sh spawn --label impl-logic --worktree
+
+<span class="text-slate-500"># 3. Send tasks</span>
+./piharness.sh task surface:5 "Build the HTML structure"
+./piharness.sh task surface:6 "Implement the API logic"
+
+<span class="text-slate-500"># 4. Wait for completion</span>
+./piharness.sh wait surface:5 --timeout 300
+./piharness.sh wait surface:6 --timeout 300
+
+<span class="text-slate-500"># 5. Collect and compare</span>
+./piharness.sh collect surface:5
+./piharness.sh collect surface:6
+./piharness.sh compare surface:5 surface:6
+
+<span class="text-slate-500"># 6. Apply best result and commit</span>
+<span class="text-slate-500"># (orchestrator reviews output, applies to repo)</span></pre>
+      </div>
+    </section>
+
+    <!-- Commands -->
+    <section id="commands" class="section-link">
+      <h2 class="text-2xl font-bold text-white mb-6">Command Reference</h2>
+      <div class="space-y-4">
+        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+          <div class="bg-slate-800/50 px-6 py-3 border-b border-slate-700">
+            <h3 class="font-semibold text-white">Spawn / Register</h3>
+          </div>
+          <div class="p-6 space-y-4">
+            <div><code class="text-sky-300">spawn [--cwd DIR] [--label L] [--worktree] [--branch B] [--role ROLE]</code><p class="text-sm text-slate-400 mt-1">Create a new Pi worker pane. First worker splits right, subsequent ones split down. Use <code class="text-sky-300">--worktree</code> for isolated git branches.</p></div>
+            <div><code class="text-sky-300">use &lt;surface&gt; [--label L]</code><p class="text-sm text-slate-400 mt-1">Register an existing cmux pane as a named worker.</p></div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+          <div class="bg-slate-800/50 px-6 py-3 border-b border-slate-700">
+            <h3 class="font-semibold text-white">Task Lifecycle</h3>
+          </div>
+          <div class="p-6 space-y-4">
+            <div><code class="text-sky-300">task &lt;surface&gt; &lt;prompt&gt;</code><p class="text-sm text-slate-400 mt-1">Send a fire-and-forget task to a Pi worker.</p></div>
+            <div><code class="text-sky-300">auto &lt;surface&gt; &lt;prompt&gt;</code><p class="text-sm text-slate-400 mt-1">Task with automatic runtime failover on error. Recommended for production use.</p></div>
+            <div><code class="text-sky-300">wait &lt;surface&gt; [--timeout N]</code><p class="text-sm text-slate-400 mt-1">Block until the worker task completes (default 300s).</p></div>
+            <div><code class="text-sky-300">collect &lt;surface&gt;</code><p class="text-sm text-slate-400 mt-1">Get the complete output from a finished task.</p></div>
+            <div><code class="text-sky-300">peek &lt;surface&gt;</code><p class="text-sm text-slate-400 mt-1">Read partial output while the worker is still running.</p></div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+          <div class="bg-slate-800/50 px-6 py-3 border-b border-slate-700">
+            <h3 class="font-semibold text-white">Skill Management (Self-Evolving)</h3>
+          </div>
+          <div class="p-6 space-y-4">
+            <div><code class="text-sky-300">skill list</code><p class="text-sm text-slate-400 mt-1">List all installed skills with version, usage count, and description.</p></div>
+            <div><code class="text-sky-300">skill show &lt;name&gt;</code><p class="text-sm text-slate-400 mt-1">Show skill details + increments usage counter.</p></div>
+            <div><code class="text-sky-300">skill new &lt;name&gt; [--pattern P] [--desc D]</code><p class="text-sm text-slate-400 mt-1">Create a new skill scaffold with SKILL.md and template.md.</p></div>
+            <div><code class="text-sky-300">skill extract &lt;surface&gt; [--name N]</code><p class="text-sm text-slate-400 mt-1">Create a skill from a completed worker's output.</p></div>
+            <div><code class="text-sky-300">skill suggest</code><p class="text-sm text-slate-400 mt-1">Get skill suggestions from task history patterns.</p></div>
+            <div><code class="text-sky-300">learn track &lt;desc&gt; [--surface S] [--outcome O]</code><p class="text-sm text-slate-400 mt-1">Log a task for pattern detection.</p></div>
+            <div><code class="text-sky-300">learn history [--limit N]</code><p class="text-sm text-slate-400 mt-1">View recent task history.</p></div>
+            <div><code class="text-sky-300">learn suggest</code><p class="text-sm text-slate-400 mt-1">Analyze history for repeated patterns and suggest new skills.</p></div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+          <div class="bg-slate-800/50 px-6 py-3 border-b border-slate-700">
+            <h3 class="font-semibold text-white">Observability & Comparison</h3>
+          </div>
+          <div class="p-6 space-y-4">
+            <div><code class="text-sky-300">status</code><p class="text-sm text-slate-400 mt-1">Dashboard: surface, label, status, elapsed, role, runtime, last line.</p></div>
+            <div><code class="text-sky-300">screen &lt;surface&gt;</code><p class="text-sm text-slate-400 mt-1">Live terminal capture of the worker pane.</p></div>
+            <div><code class="text-sky-300">list</code><p class="text-sm text-slate-400 mt-1">Full table of registered workers with metadata.</p></div>
+            <div><code class="text-sky-300">compare &lt;s1&gt; &lt;s2&gt;</code><p class="text-sm text-slate-400 mt-1">Side-by-side output comparison.</p></div>
+            <div><code class="text-sky-300">diff &lt;s1&gt; &lt;s2&gt;</code><p class="text-sm text-slate-400 mt-1">Git diff between worktree branches.</p></div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+          <div class="bg-slate-800/50 px-6 py-3 border-b border-slate-700">
+            <h3 class="font-semibold text-white">Cleanup</h3>
+          </div>
+          <div class="p-6 space-y-4">
+            <div><code class="text-sky-300">close &lt;surface&gt; [--keep-worktree]</code><p class="text-sm text-slate-400 mt-1">Exit a worker pane and clean up.</p></div>
+            <div><code class="text-sky-300">clean</code><p class="text-sm text-slate-400 mt-1">Reset all state: outputs, logs, registry.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Skills System -->
+    <section id="skills" class="section-link">
+      <h2 class="text-2xl font-bold text-white mb-6">Self-Evolving Skill System</h2>
+      <p class="text-slate-400 mb-6">PIHARNESS learns from repetitive work. Tasks that repeat 3+ times get extracted into reusable skills with trigger patterns, templates, and auto-suggestion.</p>
+
+      <div class="grid md:grid-cols-3 gap-4 mb-8">
+        <div class="skill-card bg-slate-900 rounded-xl p-5 border border-slate-800">
+          <div class="text-sky-400 font-semibold mb-2">prompt-escaping</div>
+          <p class="text-sm text-slate-400 mb-3">Avoid shell mangling of prompts with special characters ($, backticks).</p>
+          <span class="text-xs bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded">4 triggers</span>
+        </div>
+        <div class="skill-card bg-slate-900 rounded-xl p-5 border border-slate-800">
+          <div class="text-emerald-400 font-semibold mb-2">runtime-fallback</div>
+          <p class="text-sm text-slate-400 mb-3">Reliable Pi worker error handling with runtime chain failover.</p>
+          <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">4 triggers</span>
+        </div>
+        <div class="skill-card bg-slate-900 rounded-xl p-5 border border-slate-800">
+          <div class="text-purple-400 font-semibold mb-2">pane-management</div>
+          <p class="text-sm text-slate-400 mb-3">Manage worker pane state and lifecycle across sessions.</p>
+          <span class="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">4 triggers</span>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <h3 class="font-semibold text-white mb-4">Skill Lifecycle</h3>
+        <pre class="text-sm text-slate-300 leading-relaxed">Task arrives → Check ~/.piharness/skills/ for matching patterns
+  → Match? → Reference skill in worker prompt
+  → No match? → Execute normally
+  → If task repeats 3+ times → Extract as skill
+
+<span class="text-slate-500"># Extract a skill from worker output</span>
+./piharness.sh skill extract surface:5 --name my-pattern
+
+<span class="text-slate-500"># The system auto-suggests via keyword clustering</span>
+./piharness.sh learn suggest
+./piharness.sh skill suggest</pre>
+      </div>
+    </section>
+
+    <!-- Pipeline -->
+    <section id="pipeline" class="section-link">
+      <h2 class="text-2xl font-bold text-white mb-6">Role-Based Pipeline</h2>
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <p class="text-slate-400 mb-4">For complex features, spawn workers with specific roles and run a full implement→test→review cycle.</p>
+        <pre class="text-sm text-slate-300 leading-relaxed"><span class="text-slate-500"># Spawn role-specific workers</span>
+./piharness.sh spawn --role implementer --worktree --label impl-1
+./piharness.sh spawn --role tester      --worktree --label test-1
+./piharness.sh spawn --role reviewer    --worktree --label review-1
+
+<span class="text-slate-500"># Run automated pipeline</span>
+./piharness.sh pipeline "Deploy Express API" --rounds 3
+
+<span class="text-slate-500"># Or orchestrate manually</span>
+./piharness.sh orchestrate surface:7 "Review and merge changes"</pre>
+      </div>
+    </section>
+
+    <!-- Runtime Chain -->
+    <section id="runtime" class="section-link">
+      <h2 class="text-2xl font-bold text-white mb-6">Runtime Chain</h2>
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <p class="text-slate-400 mb-4">When a model hits rate limits or errors, the runtime chain automatically fails over to the next available runtime:</p>
+        <div class="flex items-center gap-2 text-sm flex-wrap mb-6">
+          <span class="bg-slate-800 text-sky-300 px-3 py-1 rounded">pi:kilo-auto/free</span>
+          <span class="text-slate-600">→</span>
+          <span class="bg-slate-800 text-sky-300 px-3 py-1 rounded">pi:stepfun/step-3.7-flash:free</span>
+          <span class="text-slate-600">→</span>
+          <span class="bg-slate-800 text-amber-300 px-3 py-1 rounded">opencode:claude-haiku-4-5</span>
+          <span class="text-slate-600">→</span>
+          <span class="bg-slate-800 text-emerald-300 px-3 py-1 rounded">ollama:qwen2.5-coder:7b</span>
+          <span class="text-slate-600">→</span>
+          <span class="bg-slate-800 text-purple-300 px-3 py-1 rounded">claude:default</span>
+        </div>
+        <p class="text-sm text-slate-400">Override with <code class="text-sky-300">PIHARNESS_RUNTIMES</code> env var. Use <code class="text-sky-300">./piharness.sh runtimes</code> to inspect.</p>
+      </div>
+    </section>
+
+    <!-- Config -->
+    <section id="env" class="section-link">
+      <h2 class="text-2xl font-bold text-white mb-6">Configuration</h2>
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-slate-400 border-b border-slate-700">
+              <th class="text-left py-2 pr-4">Variable</th>
+              <th class="text-left py-2 pr-4">Default</th>
+              <th class="text-left py-2">Description</th>
+            </tr>
+          </thead>
+          <tbody class="text-slate-300">
+            <tr class="border-b border-slate-800"><td class="py-2 pr-4"><code>PIHARNESS_DIR</code></td><td class="py-2 pr-4"><code>~/.piharness</code></td><td class="py-2">State directory</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-4"><code>PIHARNESS_REPO</code></td><td class="py-2 pr-4"><code>script dir</code></td><td class="py-2">Git repo for worktrees</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-4"><code>PIHARNESS_RUNTIMES</code></td><td class="py-2 pr-4"><code>pi:...→claude</code></td><td class="py-2">Runtime failover chain</td></tr>
+            <tr class="border-b border-slate-800"><td class="py-2 pr-4"><code>PIHARNESS_MAX_WORKERS</code></td><td class="py-2 pr-4"><code>3</code></td><td class="py-2">Max concurrent workers</td></tr>
+            <tr><td class="py-2 pr-4"><code>PIHARNESS_ORCHESTRATOR</code></td><td class="py-2 pr-4"><code>chain[0]</code></td><td class="py-2">Runtime for orchestrator role</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MCP Tools -->
+    <section id="mcp" class="section-link">
+      <h2 class="text-2xl font-bold text-white mb-6">MCP Server Tools</h2>
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <p class="text-slate-400 mb-4">PIHARNESS exposes its full command set as MCP tools for orchestrator agents:</p>
+        <div class="grid md:grid-cols-2 gap-3 text-sm">
+          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">spawn_worker</code><p class="text-slate-500 text-xs mt-1">Create Pi worker pane</p></div>
+          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">run_task</code><p class="text-slate-500 text-xs mt-1">Send task to worker</p></div>
+          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">wait_worker</code><p class="text-slate-500 text-xs mt-1">Block until done</p></div>
+          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">get_output</code><p class="text-slate-500 text-xs mt-1">Get final output</p></div>
+          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">get_status</code><p class="text-slate-500 text-xs mt-1">Worker dashboard</p></div>
+          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">compare_outputs</code><p class="text-slate-500 text-xs mt-1">Side-by-side review</p></div>
+          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">git_diff</code><p class="text-slate-500 text-xs mt-1">Worktree branch diff</p></div>
+          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">skill_list</code><p class="text-slate-500 text-xs mt-1">List installed skills</p></div>
+          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">skill_extract</code><p class="text-slate-500 text-xs mt-1">Extract skill from output</p></div>
+          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">learn_track</code><p class="text-slate-500 text-xs mt-1">Log task for learning</p></div>
+          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">learn_suggest</code><p class="text-slate-500 text-xs mt-1">Get pattern suggestions</p></div>
+          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">close_worker</code><p class="text-slate-500 text-xs mt-1">Clean up worker pane</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="text-center text-sm text-slate-600 py-8 border-t border-slate-800">
+      PIHARNESS &mdash; built for Claude Code orchestration &middot; MIT
+    </footer>
+  </main>
+</body>
+</html>
