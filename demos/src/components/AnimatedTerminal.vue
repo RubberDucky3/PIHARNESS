@@ -10,7 +10,7 @@
     </div>
     <div class="terminal-body">
       <div class="terminal-line" v-for="(line, i) in displayedLines" :key="i">
-        <span class="terminal-prompt">{{ line.prompt }}</span>
+        <span class="terminal-prompt" :class="promptClass(line.prompt)">{{ line.prompt }}</span>
         <span v-if="line.typing" class="terminal-typing">{{ line.text }}<span class="cursor-blink">▊</span></span>
         <span v-else>{{ line.text }}</span>
       </div>
@@ -91,6 +91,14 @@ function typeNextChar() {
   }
 }
 
+function promptClass(p) {
+  if (p === '$') return 'prompt-dollar'
+  if (p === '✓') return 'prompt-check'
+  if (p === '▶') return 'prompt-play'
+  if (p === 'ℹ') return 'prompt-info'
+  return ''
+}
+
 function resetAndCycle() {
   displayedLines.value = []
   currentLine = 0
@@ -157,8 +165,8 @@ onBeforeUnmount(() => {
 }
 
 .terminal-line {
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
+  word-break: normal;
   color: #e6edf3;
 }
 
@@ -170,6 +178,11 @@ onBeforeUnmount(() => {
 .terminal-prompt:first-child {
   color: #58a6ff;
 }
+
+.prompt-dollar { color: #58a6ff; }
+.prompt-check { color: #3fb950; }
+.prompt-play  { color: #d29922; }
+.prompt-info  { color: #79c0ff; }
 
 .terminal-typing {
   border-right: none;

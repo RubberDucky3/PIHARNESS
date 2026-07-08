@@ -26,6 +26,12 @@ const routes = [
     component: () => import('../views/AboutView.vue'),
     meta: { title: 'About — PIHARNESS' },
   },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('../views/NotFoundView.vue'),
+    meta: { title: '404 — PIHARNESS' },
+  },
 ]
 
 const router = createRouter({

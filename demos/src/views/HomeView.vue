@@ -34,7 +34,7 @@ const demoCommands = [
         <div class="hero-actions">
           <router-link to="/demos" class="btn btn-primary">Watch Demos</router-link>
           <router-link to="/commands" class="btn btn-secondary">Commands</router-link>
-          <a href="https://github.com/your-org/PIHARNESS" target="_blank" class="btn btn-secondary">GitHub ↗</a>
+          <a href="https://github.com/RubberDucky3/PIHARNESS" target="_blank" class="btn btn-secondary">GitHub ↗</a>
         </div>
       </div>
       <AnimatedTerminal :commands="demoCommands" />
@@ -71,7 +71,7 @@ const demoCommands = [
       </div>
       <div class="code-block">
         <div class="code-header">Terminal</div>
-        <pre><code><span class="prompt">$</span> git clone https://github.com/your-org/PIHARNESS.git
+        <pre><code><span class="prompt">$</span> git clone https://github.com/RubberDucky3/PIHARNESS.git
 <span class="prompt">$</span> cd PIHARNESS
 <span class="prompt">$</span> ./piharness.sh spawn --label worker-a --worktree
 <span class="green">✓</span> Spawned worker-a
