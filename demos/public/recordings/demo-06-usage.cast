@@ -1,0 +1,13 @@
+{"version":3,"term":{"cols":100,"rows":30},"timestamp":1783485972,"idle_time_limit":2.0,"command":"bash demos/demo-06-usage.sh","env":{"SHELL":"/bin/zsh"}}
+[0.010, "o", "==============================================\r\n  PIHARNESS Demo 6: Runtime Usage Statistics\r\n==============================================\r\n\r\n"]
+[0.000, "o", ">>> Available usage commands:\r\n    ./piharness.sh usage stats   — Per-runtime health table\r\n    ./piharness.sh usage prune   — Clean old entries (>7d)\r\n\r\n"]
+[0.000, "o", ">>> Running: ./piharness.sh usage stats\r\n\r\n"]
+[0.105, "o", "No usage data yet\r\n"]
+[0.002, "o", "\r\n>>> The health table shows:\r\n    RUNTIME       | Total | Success | Fail | Avg Latency | Last Used\r\n"]
+[0.000, "o", "    pi:kilo-auto    |  3    |  2      |  1   | 4.0s        | 2h ago\r\n"]
+[0.000, "o", "    opencode:haiku  |  2    |  2      |  0   | 7.8s        | 30m ago\r\n    gemini:flash    |  1    |  1      |  0   | 5.2s        | 10m ago\r\n\r\n>>> Running: ./piharness.sh usage prune\r\n"]
+[0.104, "o", "Pruned 0 old entries, 0 active cooldowns\r\n"]
+[0.003, "o", "\r\nThis data drives the intelligent runtime fallback:\r\n  - Runtimes with high failure rates get cooldowns\r\n"]
+[0.000, "o", "  - Best performing runtime is preferred after chain exhaustion\r\n"]
+[0.000, "o", "  - Rate-limited runtimes are skipped until cooldown expires\r\n\r\n==============================================\r\n  Demo 6 Complete\r\n==============================================\r\n"]
+[0.001, "x", "0"]
