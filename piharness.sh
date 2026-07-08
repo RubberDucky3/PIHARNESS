@@ -19,6 +19,10 @@ LAST_SURFACE_FILE="$PIHARNESS_DIR/last_surface"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${PIHARNESS_REPO:-$SCRIPT_DIR}"
 
+# ── Skill system ────────────────────────────────────────────────────────────
+SKILLS_DIR="${PIHARNESS_SKILLS_DIR:-$HOME/.piharness/skills}"
+SKILLS_REGISTRY="$SKILLS_DIR/registry.json"
+
 # ── Runtime chain ─────────────────────────────────────────────────────────────
 # Tried in order when a model hits its limit. Format: TYPE:MODEL
 # Types: pi, opencode, ollama, claude
@@ -200,29 +204,48 @@ case "$cmd" in
     role="worker"
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --cwd)      cwd="$2";   shift 2 ;;
-        --label)    label="$2"; shift 2 ;;
-        --worktree) use_worktree=true; shift ;;
-        --branch)   branch="$2"; shift 2 ;;
-        --role)     role="$2";  shift 2 ;;
+        --cwd)        cwd="$2";   shift 2 ;;
+        --label)      label="$2"; shift 2 ;;
+        --worktree)   use_worktree=true; shift ;;
+        --branch)     branch="$2"; shift 2 ;;
+        --role)       role="$2";  shift 2 ;;
+        --max-workers) MAX_WORKERS="$2"; shift 2 ;;
         *) echo "Unknown arg: $1" >&2; exit 1 ;;
       esac
     done
 
     worker_count=$(wc -l < "$REGISTRY" | tr -d ' ')
     if [[ "$worker_count" -ge "$MAX_WORKERS" ]]; then
-      echo "ERROR: max $MAX_WORKERS workers already running. Use 'close <surface>' first." >&2
-      exit 1
+      close_count=$(( worker_count - MAX_WORKERS + 1 ))
+      echo "Auto-closing $close_count old worker(s) to make room for new one..."
+      while IFS=$'\t' read -r surf lbl cwd wt br start_epoch role; do
+        [[ $close_count -le 0 ]] && break
+        bash "$SCRIPT_DIR/piharness.sh" close "$surf" >/dev/null 2>&1 || true
+        echo "  Closed $surf ($lbl)"
+        close_count=$(( close_count - 1 ))
+      done < "$REGISTRY"
+      worker_count=$(wc -l < "$REGISTRY" | tr -d ' ')
+    fi
+
+    ws_flag=""
+    # Detect current workspace from cmux tree output (prefers ref format like workspace:1)
+    detected_ws=$(cmux tree --all 2>/dev/null | grep -oE 'workspace:[0-9]+' | head -1)
+    if [[ -n "$detected_ws" ]]; then
+      ws_flag="--workspace $detected_ws"
+    elif [[ -n "${CMUX_WORKSPACE_ID:-}" ]]; then
+      # Fallback: convert UUID to ref by listing workspaces
+      ws_ref=$(cmux list-workspaces 2>/dev/null | grep -oE 'workspace:[0-9]+' | head -1)
+      [[ -n "$ws_ref" ]] && ws_flag="--workspace $ws_ref"
     fi
 
     if [[ "$worker_count" -eq 0 ]]; then
-      raw=$(cmux new-split right --focus false 2>&1)
+      raw=$(cmux new-split right $ws_flag --focus false 2>&1)
     else
       split_from=$(cat "$LAST_SURFACE_FILE" 2>/dev/null || echo "")
       if [[ -n "$split_from" ]]; then
-        raw=$(cmux new-split down --surface "$split_from" --focus false 2>&1)
+        raw=$(cmux new-split down --surface "$split_from" $ws_flag --focus false 2>&1)
       else
-        raw=$(cmux new-split down --focus false 2>&1)
+        raw=$(cmux new-split down $ws_flag --focus false 2>&1)
       fi
     fi
 
@@ -1004,6 +1027,286 @@ INSTRUCTIONS:
     ;;
 
   # ---------------------------------------------------------------------------
+  skill)
+  # ---------------------------------------------------------------------------
+  # Usage: piharness skill list|show|new|extract|suggest [args]
+  # Manage the PIHARNESS skill library at ~/.piharness/skills/
+    skill_cmd="${1:-list}"; shift || true
+    case "$skill_cmd" in
+      list)
+        if [[ ! -f "$SKILLS_REGISTRY" ]]; then
+          echo "No skills registry found at $SKILLS_REGISTRY. Create skills with 'skill new'." >&2
+          exit 0
+        fi
+        echo ""
+        printf '%-24s %-8s %-10s %-14s %s\n' "NAME" "VERSION" "USAGE" "CREATED" "DESCRIPTION"
+        printf '%-24s %-8s %-10s %-14s %s\n' "────" "──────" "─────" "───────" "───────────"
+        python3 -c "
+import json
+with open('$SKILLS_REGISTRY') as f:
+    reg = json.load(f)
+for s in reg.get('skills', []):
+    print(f\"{s['name']:<24} {s['version']:<8} {s['usage_count']:<10} {s['created']:<14} {s['description']}\")
+" 2>/dev/null || echo "Error reading registry"
+        echo ""
+        ;;
+      show)
+        [[ $# -lt 1 ]] && { echo "Usage: piharness skill show <name>" >&2; exit 1; }
+        skill_name="$1"; shift
+        skill_file="$SKILLS_DIR/$skill_name/SKILL.md"
+        if [[ ! -f "$skill_file" ]]; then
+          echo "ERROR: skill not found: $skill_name" >&2
+          exit 1
+        fi
+        echo "── Skill: $skill_name ──"
+        cat "$skill_file"
+        echo ""
+        # Increment usage_count
+        python3 -c "
+import json
+with open('$SKILLS_REGISTRY') as f:
+    reg = json.load(f)
+for s in reg.get('skills', []):
+    if s['name'] == '$skill_name':
+        s['usage_count'] = s.get('usage_count', 0) + 1
+        break
+with open('$SKILLS_REGISTRY', 'w') as f:
+    json.dump(reg, f, indent=2)
+" 2>/dev/null || true
+        ;;
+      new)
+        [[ $# -lt 1 ]] && { echo "Usage: piharness skill new <name> [--pattern P] [--desc D]" >&2; exit 1; }
+        new_name="$1"; shift
+        new_pattern=""; new_desc=""
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --pattern) new_pattern="$2"; shift 2 ;;
+            --desc)    new_desc="$2";    shift 2 ;;
+            *) echo "Unknown arg: $1" >&2; exit 1 ;;
+          esac
+        done
+        [[ -z "$new_desc" ]] && new_desc="Custom skill: $new_name"
+        new_dir="$SKILLS_DIR/$new_name"
+        [[ -d "$new_dir" ]] && { echo "ERROR: skill already exists: $new_name" >&2; exit 1; }
+        mkdir -p "$new_dir"
+        cat > "$new_dir/SKILL.md" <<SKILL_EOF
+---
+name: $new_name
+version: 1
+created: $(date -u +%Y-%m-%d)
+usage_count: 0
+trigger_patterns: [${new_pattern:+$new_pattern}]
+description: "$new_desc"
+---
+# Skill: $new_name
+
+## Problem
+[Describe the problem this skill solves]
+
+## Pattern
+[Describe the recommended pattern]
+
+## Prevention
+[Describe how to prevent this issue]
+SKILL_EOF
+        cat > "$new_dir/template.md" <<TEMPLATE_EOF
+<skill:$new_name>
+Apply the pattern from [[SKILL.md]] — $new_desc.
+</skill>
+TEMPLATE_EOF
+        if [[ -f "$SKILLS_REGISTRY" ]]; then
+          python3 -c "
+import json
+from datetime import datetime, timezone
+reg_path = '$SKILLS_REGISTRY'
+with open(reg_path) as f:
+    reg = json.load(f)
+new_skill = {
+    'name': '$new_name',
+    'version': 1,
+    'created': datetime.now(timezone.utc).strftime('%Y-%m-%d'),
+    'usage_count': 0,
+    'trigger_patterns': [p.strip() for p in '$new_pattern'.split(',') if p.strip()],
+    'description': '$new_desc',
+    'path': '$new_dir'
+}
+reg['skills'].append(new_skill)
+reg['last_updated'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+with open(reg_path, 'w') as f:
+    json.dump(reg, f, indent=2)
+print('Registered: $new_name')
+" || echo "Warning: could not register skill"
+        fi
+        echo "Created skill: $new_name"
+        echo "  Directory: $new_dir"
+        echo "  SKILL.md:  $new_dir/SKILL.md"
+        echo "  Template:  $new_dir/template.md"
+        ;;
+      extract)
+        [[ $# -lt 1 ]] && { echo "Usage: piharness skill extract <surface> [--name N] [--trigger T] [--desc D]" >&2; exit 1; }
+        ext_surface="$1"; shift
+        ext_name=""; ext_trigger=""; ext_desc=""
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --name)    ext_name="$2";    shift 2 ;;
+            --trigger) ext_trigger="$2"; shift 2 ;;
+            --desc)    ext_desc="$2";    shift 2 ;;
+            *) echo "Unknown: $1" >&2; exit 1 ;;
+          esac
+        done
+        ext_outfile="$OUTPUTS_DIR/${ext_surface//:/+}.txt"
+        [[ ! -f "$ext_outfile" ]] && { echo "No output for $ext_surface" >&2; exit 1; }
+        if [[ -z "$ext_name" ]]; then
+          ext_name=$(grep -v -E '__PIHARNESS_DONE__|__PIHARNESS_ERROR__' "$ext_outfile" 2>/dev/null \
+            | tr ' ' '\n' | grep -oE '[a-zA-Z][a-zA-Z0-9]{3,}' | tr '[:upper:]' '[:lower:]' \
+            | sort | uniq -c | sort -rn | head -5 | awk '{print $2}' | tr '\n' '-' | sed 's/-$//')
+          [[ -z "$ext_name" ]] && ext_name="extracted-$(date +%s)"
+        fi
+        [[ -z "$ext_trigger" ]] && ext_trigger="$ext_name"
+        [[ -z "$ext_desc" ]] && ext_desc="Auto-extracted from worker $ext_surface"
+        bash "$SCRIPT_DIR/piharness.sh" skill new "$ext_name" --pattern "$ext_trigger" --desc "$ext_desc"
+        echo ""
+        echo "Extracted skill: $ext_name from $ext_surface"
+        echo "  Edit: $SKILLS_DIR/$ext_name/SKILL.md"
+        echo "  Template: $SKILLS_DIR/$ext_name/template.md"
+        ;;
+      suggest)
+        bash "$SCRIPT_DIR/piharness.sh" learn suggest
+        ;;
+      *)
+        echo "Usage: piharness skill <list|show|new|extract|suggest>" >&2; exit 1 ;;
+    esac
+    ;;
+
+  # ---------------------------------------------------------------------------
+  learn)
+  # ---------------------------------------------------------------------------
+  # Usage: piharness learn track|history|suggest [args]
+  # Track tasks and detect patterns for auto-suggestion
+    TASK_HISTORY="$PIHARNESS_DIR/task-history.json"
+    learn_cmd="${1:-suggest}"; shift || true
+    case "$learn_cmd" in
+      track)
+        [[ $# -lt 1 ]] && { echo "Usage: piharness learn track <description> [--surface S] [--outcome O] [--skill NAME]" >&2; exit 1; }
+        task_desc="$1"; shift
+        task_surface=""; task_outcome=""; task_skill=""
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --surface) task_surface="$2"; shift 2 ;;
+            --outcome) task_outcome="$2"; shift 2 ;;
+            --skill)   task_skill="$2";   shift 2 ;;
+            *) echo "Unknown: $1" >&2; exit 1 ;;
+          esac
+        done
+        if [[ ! -f "$TASK_HISTORY" ]]; then
+          echo '{"version":1,"tasks":[],"clusters":[]}' > "$TASK_HISTORY"
+        fi
+        task_skill_py="None"
+        [[ -n "$task_skill" ]] && task_skill_py="'$task_skill'"
+        python3 -c "
+import json, os
+path = os.path.expanduser('$TASK_HISTORY')
+with open(path) as f:
+    hist = json.load(f)
+task_num = len(hist.get('tasks', [])) + 1
+task = {
+    'id': f'task_{task_num:03d}',
+    'description': '$task_desc',
+    'timestamp': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+    'matched_skill': $task_skill_py,
+    'surface': '${task_surface:-}',
+    'outcome': '${task_outcome:-unknown}',
+    'patterns_extracted': False
+}
+hist.setdefault('tasks', []).append(task)
+hist['last_updated'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+with open(path, 'w') as f:
+    json.dump(hist, f, indent=2)
+print(f'Tracked task_{task_num:03d}: $task_desc')
+" || echo "Error tracking task"
+        ;;
+      history)
+        limit=20
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --limit) limit="$2"; shift 2 ;;
+            *) echo "Unknown: $1" >&2; exit 1 ;;
+          esac
+        done
+        if [[ ! -f "$TASK_HISTORY" ]]; then
+          echo "No task history yet."; exit 0
+        fi
+        echo ""
+        printf '%-10s %-22s %-24s %-10s %s\n' "ID" "TIMESTAMP" "DESCRIPTION" "OUTCOME" "SKILL"
+        printf '%-10s %-22s %-24s %-10s %s\n' "──" "─────────" "───────────" "───────" "─────"
+        python3 -c "
+import json, os
+path = os.path.expanduser('$TASK_HISTORY')
+with open(path) as f:
+    hist = json.load(f)
+tasks = hist.get('tasks', [])[-${limit}:]
+for t in tasks:
+    skill = t.get('matched_skill') or '-'
+    desc = t.get('description', '')[:23]
+    print(f\"{t['id']:<10} {t['timestamp']:<22} {desc:<24} {t.get('outcome',''):<10} {skill}\")
+" 2>/dev/null || echo "Error reading history"
+        echo ""
+        ;;
+      suggest)
+        if [[ ! -f "$TASK_HISTORY" ]]; then
+          echo "No patterns detected yet — keep working!"
+          exit 0
+        fi
+        python3 -c "
+import json, os, re
+STOP_WORDS = {'a','an','the','for','to','in','on','at','with','by','from','and','or','of','is','are','was','were','be','been','being','have','has','had','do','does','did','but','not','what','which','who','whom','this','that','these','those','build','create','make','using','into','out','up','down','new','old','fix','add','run','set','get','use','implement'}
+path = os.path.expanduser('$TASK_HISTORY')
+with open(path) as f:
+    hist = json.load(f)
+tasks = hist.get('tasks', [])
+if not tasks:
+    print('No patterns detected yet — keep working!')
+    exit(0)
+keywords = {}
+for t in tasks:
+    words = set(re.findall(r'[a-zA-Z][a-zA-Z0-9]{2,}', t['description'].lower())) - STOP_WORDS
+    keywords[t['id']] = words
+clusters = []
+used = set()
+for t1 in tasks:
+    if t1['id'] in used: continue
+    cluster = [t1]
+    used.add(t1['id'])
+    for t2 in tasks:
+        if t2['id'] in used: continue
+        shared = len(keywords.get(t1['id'], set()) & keywords.get(t2['id'], set()))
+        if shared >= 2:
+            cluster.append(t2)
+            used.add(t2['id'])
+    if len(cluster) >= 2:
+        all_kw = set()
+        for t in cluster: all_kw |= keywords.get(t['id'], set())
+        clusters.append({'tasks': [t['id'] for t in cluster], 'count': len(cluster), 'keywords': list(all_kw)[:5]})
+if not clusters:
+    print('No patterns detected yet — keep working!')
+    exit(0)
+print()
+print('Suggestions for new skills:')
+print('─' * 40)
+for c in clusters:
+    name = '-'.join(c['keywords'][:2]) if c['keywords'] else 'unnamed-pattern'
+    print(f'{name} ({c[\"count\"]} similar tasks)')
+    print(f'  Keywords: {\", \".join(c[\"keywords\"])}')
+    print(f'  Run: piharness skill new {name} --pattern \"{c[\"keywords\"][0] if c[\"keywords\"] else name}\" --desc \"Auto-suggested from {c[\"count\"]} tasks\"')
+    print()
+" 2>/dev/null || echo "Error analyzing patterns"
+        ;;
+      *)
+        echo "Usage: piharness learn <track|history|suggest>" >&2; exit 1 ;;
+    esac
+    ;;
+
+  # ---------------------------------------------------------------------------
   help|*)
   # ---------------------------------------------------------------------------
     cat <<'EOF'
@@ -1036,6 +1339,18 @@ Observability:
 Comparison:
   compare <surface1> <surface2>      Show both outputs
   diff    <surface1> <surface2>      Git diff worktree branches
+
+Skill management (self-evolving):
+  skill list                         List installed skills
+  skill show <name>                  Show skill details (+ usage count)
+  skill new <name> [--pattern P]     Create skill scaffold
+  skill extract <surface> [--name N] Create skill from worker output
+  skill suggest                      Suggest skills from task patterns
+
+Learning & pattern detection:
+  learn track <desc> [--surface S]   Log a task for pattern detection
+  learn history [--limit N]          Show recent task history
+  learn suggest                      Suggest new skills from repeated patterns
 
 Cleanup:
   close  <surface> [--keep-worktree]
