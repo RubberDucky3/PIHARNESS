@@ -23,7 +23,7 @@ REPO_DIR="${PIHARNESS_REPO:-$SCRIPT_DIR}"
 # Tried in order when a model hits its limit. Format: TYPE:MODEL
 # Types: pi, opencode, ollama, claude
 # Override with PIHARNESS_RUNTIMES env var
-RUNTIME_CHAIN="${PIHARNESS_RUNTIMES:-pi:nvidia/nemotron-3-ultra-550b-a55b:free,pi:stepfun/step-3.7-flash:free,opencode:anthropic/claude-haiku-4.5,ollama:qwen2.5-coder:7b,claude:default}"
+RUNTIME_CHAIN="${PIHARNESS_RUNTIMES:-pi:kilo-auto/free,opencode:anthropic/claude-haiku-4-5,ollama:qwen2.5-coder:7b,claude:default}"
 
 MAX_WORKERS="${PIHARNESS_MAX_WORKERS:-3}"
 
