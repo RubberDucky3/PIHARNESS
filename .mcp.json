@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "piharness": {
+      "command": "node",
+      "args": ["/Users/jeromefrancis/Documents/PIHARNESS/mcp-server/index.js"]
+    }
+  }
+}
