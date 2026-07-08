@@ -38,3 +38,5 @@ server/node_modules/
 server/package-lock.json
 mcp-server/node_modules/
 mcp-server/package-lock.json
+.slim/deepwork/
+obsidian-vault/

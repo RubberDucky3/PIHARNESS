@@ -30,6 +30,10 @@ import { RouterLink, RouterView } from 'vue-router'
           <span class="nav-icon">⚙</span>
           <span class="nav-label">Settings</span>
         </RouterLink>
+        <RouterLink to="/knowledge" class="nav-item" active-class="active">
+          <span class="nav-icon">◫</span>
+          <span class="nav-label">Knowledge</span>
+        </RouterLink>
       </nav>
     </aside>
     <main class="main">

@@ -130,6 +130,13 @@ The new orchestrator receives a full briefing of current worker state and picks 
 ./piharness.sh clean                           # reset all state
 ```
 
+## Knowledge Layer
+
+- Use `obsidian-vault/` as the project's **Obsidian second brain**: notes, MOCs, decisions, and ADE knowledge.
+- ADE includes a **Knowledge** view that can load the vault for browsing during development.
+- When exploring architecture or planning, prefer updating or extending vault notes over ad-hoc markdown in chat.
+- If graph-style navigation becomes useful, run graphify against the vault or relevant code directories.
+
 ## What NOT to do
 
 - Do not write implementation code yourself when a worker can do it

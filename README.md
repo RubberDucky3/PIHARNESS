@@ -64,17 +64,17 @@ piharness skill show deploy     # See the deployment pattern
 
 ## Demos
 
-Watch PIHARNESS in action. View the **[interactive demo website](demos/index.html)** with embedded terminal recordings, or play the recordings directly.
+Watch PIHARNESS in action. View the **[interactive demo website](demos/index.html)** with embedded video demos.
 
-| # | Demo | Command | Play Recording |
-|---|------|---------|---------------|
-| 01 | Spawn + Auto Task | `spawn` + `auto` | [`demos/recordings/demo-01-spawn-auto.cast`](demos/recordings/demo-01-spawn-auto.cast) |
-| 02 | Status Dashboard | `status` | [`demos/recordings/demo-02-status.cast`](demos/recordings/demo-02-status.cast) |
-| 03 | Role-Based Pipeline | `pipeline` | [`demos/recordings/demo-03-pipeline.cast`](demos/recordings/demo-03-pipeline.cast) |
-| 04 | Self-Evolve + Nightly | `self-evolve` + `nightly` | [`demos/recordings/demo-04-self-evolve.cast`](demos/recordings/demo-04-self-evolve.cast) |
-| 05 | Orchestrator Supervision | `supervise` | [`demos/recordings/demo-05-supervise.cast`](demos/recordings/demo-05-supervise.cast) |
-| 06 | Usage Statistics | `usage stats` | [`demos/recordings/demo-06-usage.cast`](demos/recordings/demo-06-usage.cast) |
-| 07 | Skills System | `skill list` + `skill show` | [`demos/recordings/demo-07-skill-list.cast`](demos/recordings/demo-07-skill-list.cast) |
+| # | Demo | Command |
+|---|------|---------|
+| 01 | Spawn + Auto Task | `spawn` + `auto` |
+| 02 | Status Dashboard | `status` |
+| 03 | Role-Based Pipeline | `pipeline` |
+| 04 | Self-Evolve + Nightly | `self-evolve` + `nightly` |
+| 05 | Orchestrator Supervision | `supervise` |
+| 06 | Usage Statistics | `usage stats` |
+| 07 | Skills System | `skill list` + `skill show` |
 
 To play a recording locally:
 ```bash

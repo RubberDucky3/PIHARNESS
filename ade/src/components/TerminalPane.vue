@@ -33,7 +33,7 @@ async function safeInvoke(cmd, args = {}) {
 function scheduleFit() {
   if (resizeTimer) clearTimeout(resizeTimer)
   resizeTimer = setTimeout(() => {
-    if (!term || !fitAddon) return
+    if (!term || !fitAddon || !terminalRef.value) return
     try {
       fitAddon.fit()
       safeInvoke('resize_terminal', {
@@ -90,6 +90,7 @@ onMounted(async () => {
     unlisten = await doListen()
   } catch (e) {
     term.writeln('\x1b[31mTerminal backend unavailable (not running inside Tauri?)\x1b[0m')
+    try { await invoke('close_terminal', { id: props.terminalId }) } catch {}
     return
   }
 
