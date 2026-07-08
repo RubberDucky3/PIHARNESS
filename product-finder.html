@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Finder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>.star-filled { color: #fbbf24; } .star-empty { color: #4b5563; }</style>
+    <script>
+        window.MockDataModule = {
+          generateProducts: function(query) {
+            var c = query.charCodeAt(0) || 65;
+            var base = 100 + (c % 800);
+            function s(i) { return (c * 7 + i * 13) % 100; }
+            var amazonBase = base;
+            var bestbuyBase = Math.round(base * 1.08);
+            var neweggBase = Math.round(base * 0.95);
+            return [
+              { id: 'amz-1', name: query + ' Pro 16GB OC Edition', price: amazonBase, rating: 3.8 + (s(1) % 11) / 10, reviews: 100 + s(2) * 120, source: 'Amazon', url: 'https://www.amazon.com/dp/B0' + (10000000 + s(3) * 10000000), inStock: s(4) > 30 },
+              { id: 'amz-2', name: query + ' Ultra 32GB SSD', price: amazonBase + 50 + (s(5) % 50), rating: 3.8 + (s(6) % 11) / 10, reviews: 100 + s(7) * 120, source: 'Amazon', url: 'https://www.amazon.com/dp/B0' + (10000000 + s(8) * 10000000), inStock: s(9) > 30 },
+              { id: 'amz-3', name: query + ' Gaming RTX 8GB', price: amazonBase - 20 + (s(10) % 40), rating: 3.8 + (s(11) % 11) / 10, reviews: 100 + s(12) * 120, source: 'Amazon', url: 'https://www.amazon.com/dp/B0' + (10000000 + s(13) * 10000000), inStock: s(14) > 30 },
+              { id: 'bb-1', name: query + ' Pro 16GB OC Edition', price: bestbuyBase, rating: 3.8 + (s(15) % 11) / 10, reviews: 100 + s(16) * 120, source: 'Best Buy', url: 'https://www.bestbuy.com/site/' + query.replace(/\s+/g, '-').toLowerCase() + '/' + (10000000 + s(17) * 10000000) + '.p', inStock: s(18) > 30 },
+              { id: 'bb-2', name: query + ' Ultra 32GB SSD', price: bestbuyBase + 50 + (s(19) % 50), rating: 3.8 + (s(20) % 11) / 10, reviews: 100 + s(21) * 120, source: 'Best Buy', url: 'https://www.bestbuy.com/site/' + query.replace(/\s+/g, '-').toLowerCase() + '/' + (10000000 + s(22) * 10000000) + '.p', inStock: s(23) > 30 },
+              { id: 'bb-3', name: query + ' Gaming RTX 8GB', price: bestbuyBase - 20 + (s(24) % 40), rating: 3.8 + (s(25) % 11) / 10, reviews: 100 + s(26) * 120, source: 'Best Buy', url: 'https://www.bestbuy.com/site/' + query.replace(/\s+/g, '-').toLowerCase() + '/' + (10000000 + s(27) * 10000000) + '.p', inStock: s(28) > 30 },
+              { id: 'ng-1', name: query + ' Pro 16GB OC Edition', price: neweggBase, rating: 3.8 + (s(29) % 11) / 10, reviews: 100 + s(30) * 120, source: 'Newegg', url: 'https://www.newegg.com/p/' + (100000000 + s(31) * 100000000), inStock: s(37) > 30 },
+              { id: 'ng-2', name: query + ' Ultra 32GB SSD', price: neweggBase + 50 + (s(33) % 50), rating: 3.8 + (s(34) % 11) / 10, reviews: 100 + s(35) * 120, source: 'Newegg', url: 'https://www.newegg.com/p/' + (100000000 + s(36) * 100000000), inStock: s(37) > 30 },
+              { id: 'ng-3', name: query + ' Gaming RTX 8GB', price: neweggBase - 20 + (s(38) % 40), rating: 3.8 + (s(39) % 11) / 10, reviews: 100 + s(40) * 120, source: 'Newegg', url: 'https://www.newegg.com/p/' + (100000000 + s(41) * 100000000), inStock: s(42) > 30 }
+            ];
+          }
+        };
+    </script>
+    <script>
+        window.RankingEngine = {
+          rankProducts(products) {
+            if (!Array.isArray(products) || products.length === 0) return [];
+            const data = products.map(p => ({ ...p, _price: Number(p.price) || 0, _rating: Number(p.rating) || 0, _reviews: Number(p.reviews) || 0 }));
+            const prices = data.map(d => d._price);
+            const valueRaws = data.map(d => (d._rating / (d._price || 1)) * 1000);
+            const reviewRaws = data.map(d => Math.log(d._reviews || 1));
+            const minPrice = Math.min(...prices), maxPrice = Math.max(...prices);
+            const minValue = Math.min(...valueRaws), maxValue = Math.max(...valueRaws);
+            const minReview = Math.min(...reviewRaws), maxReview = Math.max(...reviewRaws);
+            const round1 = n => Math.round(n * 10) / 10;
+            const computed = data.map((d, i) => {
+              const priceScore = maxPrice === minPrice ? 100 : ((maxPrice - d._price) / (maxPrice - minPrice)) * 100;
+              const ratingScore = (d._rating / 5) * 100;
+              const valueScore = maxValue === minValue ? 100 : ((valueRaws[i] - minValue) / (maxValue - minValue)) * 100;
+              const reviewScore = maxReview === minReview ? 100 : ((reviewRaws[i] - minReview) / (maxReview - minReview)) * 100;
+              const combinedScore = (priceScore + ratingScore + valueScore + reviewScore) / 4;
+              return { product: d, priceScore: round1(priceScore), ratingScore: round1(ratingScore), valueScore: round1(valueScore), reviewScore: round1(reviewScore), combinedScore: round1(combinedScore) };
+            });
+            const maxPriceScore = Math.max(...computed.map(c => c.priceScore));
+            const maxRatingScore = Math.max(...computed.map(c => c.ratingScore));
+            const maxValueScore = Math.max(...computed.map(c => c.valueScore));
+            const maxReviewScore = Math.max(...computed.map(c => c.reviewScore));
+            const maxCombined = Math.max(...computed.map(c => c.combinedScore));
+            const result = computed.map(c => {
+              const badges = [];
+              if (c.priceScore === maxPriceScore) badges.push("BEST PRICE");
+              if (c.ratingScore === maxRatingScore) badges.push("TOP RATED");
+              if (c.valueScore === maxValueScore) badges.push("BEST VALUE");
+              if (c.reviewScore === maxReviewScore) badges.push("MOST REVIEWS");
+              if (c.combinedScore === maxCombined) badges.push("BEST PICK");
+              const { _price, _rating, _reviews, ...rest } = c.product;
+              return { ...rest, combinedScore: c.combinedScore, badges };
+            });
+            result.sort((a, b) => b.combinedScore - a.combinedScore);
+            return result;
+          }
+        };
+    </script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold mb-2">Product Finder</h1>
+            <p class="text-gray-400 mb-6">Powered by 3 Pi agents</p>
+            <div class="flex justify-center gap-2 max-w-2xl mx-auto">
+                <input type="text" id="searchInput" placeholder="Search electronics... (e.g. RTX 4090, MacBook Pro)" class="flex-1 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                <button id="searchBtn" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors">Search</button>
+            </div>
+        </header>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700"><div class="flex items-center justify-between"><div><p class="text-sm text-gray-400">Agent 1</p><p class="font-semibold">Mock Data</p></div><span class="px-3 py-1 bg-green-600 text-white text-xs font-bold rounded-full">done</span></div></div>
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700"><div class="flex items-center justify-between"><div><p class="text-sm text-gray-400">Agent 2</p><p class="font-semibold">Ranking Engine</p></div><span class="px-3 py-1 bg-green-600 text-white text-xs font-bold rounded-full">done</span></div></div>
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700"><div class="flex items-center justify-between"><div><p class="text-sm text-gray-400">Agent 3</p><p class="font-semibold">Frontend UI</p></div><span class="px-3 py-1 bg-green-600 text-white text-xs font-bold rounded-full">done</span></div></div>
+        </div>
+        <div id="resultsContainer" class="hidden">
+            <div id="bestPickCard" class="relative bg-gray-800 rounded-lg p-6 mb-8 border-2 border-yellow-500">
+                <div class="absolute top-0 left-0 bg-yellow-500 text-gray-900 px-4 py-1 rounded-br-lg font-bold text-sm">BEST PICK</div>
+                <div id="bestPickContent" class="mt-4"></div>
+            </div>
+            <div id="productGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+        </div>
+    </div>
+    <script>
+        function renderStars(rating) {
+            var full = Math.floor(rating);
+            var half = rating - full >= 0.5 ? 1 : 0;
+            var empty = 5 - full - half;
+            var html = '';
+            for (var i = 0; i < full; i++) html += '<span class="star-filled">★</span>';
+            if (half) html += '<span class="star-filled">★</span>';
+            for (var j = 0; j < empty; j++) html += '<span class="star-empty">☆</span>';
+            return html;
+        }
+
+        function renderProducts(rankedProducts) {
+            var grid = document.getElementById('productGrid');
+            grid.innerHTML = '';
+            if (!rankedProducts || rankedProducts.length === 0) {
+                document.getElementById('resultsContainer').classList.add('hidden');
+                return;
+            }
+            var bestPick = rankedProducts[0];
+            var bestPickContent = document.getElementById('bestPickContent');
+            var sourceBadgeClass = bestPick.source === 'Amazon' ? 'bg-orange-600' : (bestPick.source === 'Best Buy' ? 'bg-blue-600' : 'bg-red-600');
+            bestPickContent.innerHTML =
+                '<div class="flex flex-wrap items-center gap-3 mb-3">' +
+                    '<span class="px-3 py-1 rounded-full text-white text-sm font-bold ' + sourceBadgeClass + '">' + bestPick.source + '</span>' +
+                    (bestPick.badges || []).map(function(b) { return '<span class="px-2 py-1 bg-yellow-500 text-gray-900 text-xs font-bold rounded">' + b + '</span>'; }).join('') +
+                '</div>' +
+                '<h2 class="text-2xl md:text-3xl font-bold mb-2">' + bestPick.name + '</h2>' +
+                '<p class="text-3xl md:text-4xl font-bold text-green-400 mb-3">$' + Math.round(bestPick.price) + '</p>' +
+                '<div class="flex flex-wrap items-center gap-3 mb-2">' +
+                    '<span class="text-xl">' + renderStars(bestPick.rating) + '</span>' +
+                    '<span class="text-gray-300 font-semibold">' + bestPick.rating.toFixed(1) + '</span>' +
+                '</div>' +
+                '<p class="text-gray-400 mb-4">' + bestPick.reviews.toLocaleString() + ' reviews</p>' +
+                '<div class="inline-flex items-center gap-2 bg-gray-700 px-3 py-2 rounded-lg">' +
+                    '<span class="text-sm text-gray-300">Score:</span>' +
+                    '<span class="text-sm font-bold text-white">' + bestPick.combinedScore.toFixed(1) + ' / 100</span>' +
+                '</div>';
+
+            for (var i = 1; i < rankedProducts.length; i++) {
+                (function(p) {
+                    var card = document.createElement('div');
+                    card.className = 'bg-gray-800 rounded-lg p-5 border border-gray-700';
+                    var sourceBadgeClass = p.source === 'Amazon' ? 'bg-orange-600' : (p.source === 'Best Buy' ? 'bg-blue-600' : 'bg-red-600');
+                    card.innerHTML =
+                        '<div class="flex flex-wrap items-center gap-2 mb-3">' +
+                            '<span class="px-2 py-1 rounded-full text-white text-xs font-bold ' + sourceBadgeClass + '">' + p.source + '</span>' +
+                            (p.badges || []).map(function(b) { return '<span class="px-2 py-1 bg-yellow-500 text-gray-900 text-xs font-bold rounded">' + b + '</span>'; }).join('') +
+                        '</div>' +
+                        '<h3 class="text-lg font-semibold mb-2">' + p.name + '</h3>' +
+                        '<p class="text-2xl font-bold text-green-400 mb-2">$' + Math.round(p.price) + '</p>' +
+                        '<div class="flex items-center gap-2 mb-1">' +
+                            '<span class="text-base">' + renderStars(p.rating) + '</span>' +
+                            '<span class="text-gray-300 text-sm">' + p.rating.toFixed(1) + '</span>' +
+                        '</div>' +
+                        '<p class="text-gray-400 text-sm mb-3">' + p.reviews.toLocaleString() + ' reviews</p>' +
+                        '<div class="w-full bg-gray-700 rounded-full h-2 mb-1">' +
+                            '<div class="bg-blue-500 h-2 rounded-full" style="width:' + Math.min(100, Math.max(0, p.combinedScore)) + '%"></div>' +
+                        '</div>' +
+                        '<p class="text-xs text-gray-400">Score: ' + p.combinedScore.toFixed(1) + ' / 100</p>';
+                    grid.appendChild(card);
+                })(rankedProducts[i]);
+            }
+        }
+
+        document.getElementById('searchBtn').addEventListener('click', function() {
+            var query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
+            var rawProducts = window.MockDataModule.generateProducts(query);
+            var rankedProducts = window.RankingEngine.rankProducts(rawProducts);
+            renderProducts(rankedProducts);
+            document.getElementById('resultsContainer').classList.remove('hidden');
+        });
+
+        document.getElementById('searchInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                var query = document.getElementById('searchInput').value.trim();
+                if (!query) return;
+                var rawProducts = window.MockDataModule.generateProducts(query);
+                var rankedProducts = window.RankingEngine.rankProducts(rawProducts);
+                renderProducts(rankedProducts);
+                document.getElementById('resultsContainer').classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
+
