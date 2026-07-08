@@ -14,7 +14,7 @@ RUNTIMES_DIR="$PIHARNESS_DIR/runtimes"
 MONITORS_DIR="$PIHARNESS_DIR/monitors"
 REGISTRY="$PIHARNESS_DIR/workers.tsv"
 LAST_SURFACE_FILE="$PIHARNESS_DIR/last_surface"
-# Registry cols: surface_id TAB label TAB cwd TAB worktree_path TAB branch TAB start_epoch
+# Registry cols: surface_id TAB label TAB cwd TAB worktree_path TAB branch TAB start_epoch TAB role
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${PIHARNESS_REPO:-$SCRIPT_DIR}"
@@ -63,6 +63,16 @@ _worker_status() {
     grep -q '__PIHARNESS_ERROR__' "$outfile" 2>/dev/null && echo "error" || echo "done"
   elif [[ -f "$outfile" ]]; then echo "running"
   else echo "idle"; fi
+}
+
+# Get all surface IDs with a given role
+_registry_by_role() {
+  awk -F'\t' -v role="$1" '$7==role{print $1}' "$REGISTRY"
+}
+
+# Get first surface with a given role
+_registry_first_role() {
+  _registry_by_role "$1" | head -1
 }
 
 # ── runtime chain helpers ─────────────────────────────────────────────────────
@@ -143,19 +153,21 @@ case "$cmd" in
 
   # ---------------------------------------------------------------------------
   spawn)
-  # Usage: piharness spawn [--cwd DIR] [--label LABEL] [--worktree] [--branch B]
+  # Usage: piharness spawn [--cwd DIR] [--label LABEL] [--worktree] [--branch B] [--role ROLE]
   # Spawns a new worker pane. Prints the surface ID.
   # ---------------------------------------------------------------------------
     cwd="$(pwd)"
     label="worker-$$"
     use_worktree=false
     branch=""
+    role="worker"
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --cwd)      cwd="$2";   shift 2 ;;
         --label)    label="$2"; shift 2 ;;
         --worktree) use_worktree=true; shift ;;
         --branch)   branch="$2"; shift 2 ;;
+        --role)     role="$2";  shift 2 ;;
         *) echo "Unknown arg: $1" >&2; exit 1 ;;
       esac
     done
@@ -192,24 +204,31 @@ case "$cmd" in
     echo "$surface" > "$LAST_SURFACE_FILE"
 
     start_epoch=$(date +%s)
-    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$surface" "$label" "$cwd" "$worktree_path" "$branch" "$start_epoch" >> "$REGISTRY"
-    _log "$surface" "SPAWNED" "label=$label cwd=$cwd worktree=${worktree_path} branch=${branch}"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$surface" "$label" "$cwd" "$worktree_path" "$branch" "$start_epoch" "$role" >> "$REGISTRY"
+    _log "$surface" "SPAWNED" "label=$label cwd=$cwd worktree=${worktree_path} branch=${branch} role=${role}"
     echo "$surface"
     ;;
 
   # ---------------------------------------------------------------------------
   use)
-  # Usage: piharness use <surface> [--label LABEL]
+  # Usage: piharness use <surface> [--label LABEL] [--role ROLE]
   # ---------------------------------------------------------------------------
-    [[ $# -lt 1 ]] && { echo "Usage: piharness use <surface> [--label LABEL]" >&2; exit 1; }
+    [[ $# -lt 1 ]] && { echo "Usage: piharness use <surface> [--label LABEL] [--role ROLE]" >&2; exit 1; }
     surface="$1"; shift
     label="worker-$$"
-    [[ "${1:-}" == "--label" ]] && { label="$2"; }
+    role="worker"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --label) label="$2"; shift 2 ;;
+        --role)  role="$2";  shift 2 ;;
+        *) echo "Unknown arg: $1" >&2; exit 1 ;;
+      esac
+    done
     start_epoch=$(date +%s)
-    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$surface" "$label" "$(pwd)" "" "" "$start_epoch" >> "$REGISTRY"
-    _log "$surface" "REGISTERED" "label=$label"
-    echo "Registered $surface as $label"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$surface" "$label" "$(pwd)" "" "" "$start_epoch" "$role" >> "$REGISTRY"
+    _log "$surface" "REGISTERED" "label=$label role=$role"
+    echo "Registered $surface as $label (role=$role)"
     ;;
 
   # ---------------------------------------------------------------------------
@@ -350,6 +369,300 @@ case "$cmd" in
 
     echo "ERROR: all $chain_len runtimes exhausted" >&2
     exit 1
+    ;;
+
+  # ---------------------------------------------------------------------------
+  pipeline)
+  # Usage: piharness pipeline <task-description> [--rounds N] [--timeout N]
+  #
+  # Orchestrates: implementer → tester → reviewer → back to implementer if rejected
+  # Workers must already be spawned with --role implementer/tester/reviewer.
+  # The loop runs up to N rounds (default 3) until reviewer approves.
+  # ---------------------------------------------------------------------------
+    [[ $# -lt 1 ]] && { echo "Usage: piharness pipeline <task> [--rounds N] [--timeout N]" >&2; exit 1; }
+    pipeline_task="$1"; shift
+    pipeline_rounds=3
+    pipeline_timeout=300
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --rounds)  pipeline_rounds="$2";  shift 2 ;;
+        --timeout) pipeline_timeout="$2"; shift 2 ;;
+        *) echo "Unknown arg: $1" >&2; exit 1 ;;
+      esac
+    done
+
+    impl_surface=$(_registry_first_role "implementer")
+    test_surface=$(_registry_first_role "tester")
+    review_surface=$(_registry_first_role "reviewer")
+
+    if [[ -z "$impl_surface" ]]; then
+      echo "ERROR: no implementer found. Spawn one with: piharness spawn --role implementer" >&2
+      exit 1
+    fi
+    if [[ -z "$test_surface" ]]; then
+      echo "ERROR: no tester found. Spawn one with: piharness spawn --role tester" >&2
+      exit 1
+    fi
+    if [[ -z "$review_surface" ]]; then
+      echo "ERROR: no reviewer found. Spawn one with: piharness spawn --role reviewer" >&2
+      exit 1
+    fi
+
+    echo "Pipeline surfaces — implementer: $impl_surface  tester: $test_surface  reviewer: $review_surface"
+
+    feedback=""
+    round=1
+    while [[ $round -le $pipeline_rounds ]]; do
+      echo ""
+      echo "── Round $round/$pipeline_rounds ──────────────────────────────"
+
+      # Build implementer prompt
+      if [[ -n "$feedback" ]]; then
+        impl_prompt="ROLE: Implementer. Task: ${pipeline_task}. Feedback from previous review: ${feedback}. Write the implementation. When done, end your response with IMPLEMENTATION COMPLETE."
+      else
+        impl_prompt="ROLE: Implementer. Task: ${pipeline_task}. Write the implementation. When done, end your response with IMPLEMENTATION COMPLETE."
+      fi
+
+      echo "[Round $round] Sending to implementer ($impl_surface)..."
+      bash "$SCRIPT_DIR/piharness.sh" task "$impl_surface" "$impl_prompt"
+      bash "$SCRIPT_DIR/piharness.sh" wait "$impl_surface" --timeout "$pipeline_timeout" || true
+
+      impl_output=$(grep -v -E '__PIHARNESS_DONE__|__PIHARNESS_ERROR__' \
+        "$(_outfile "$impl_surface")" 2>/dev/null | head -c 2000 || true)
+
+      echo "[Round $round] Sending to tester ($test_surface)..."
+      test_prompt="ROLE: Tester. Review this implementation and write tests:
+
+${impl_output}
+
+Test the code, report any failures. End with TEST RESULTS: PASS or TEST RESULTS: FAIL with details."
+
+      bash "$SCRIPT_DIR/piharness.sh" task "$test_surface" "$test_prompt"
+      bash "$SCRIPT_DIR/piharness.sh" wait "$test_surface" --timeout "$pipeline_timeout" || true
+
+      test_output=$(grep -v -E '__PIHARNESS_DONE__|__PIHARNESS_ERROR__' \
+        "$(_outfile "$test_surface")" 2>/dev/null | head -c 2000 || true)
+
+      echo "[Round $round] Sending to reviewer ($review_surface)..."
+      review_prompt="ROLE: Reviewer. Review this implementation and test results:
+
+IMPLEMENTATION:
+${impl_output}
+
+TEST RESULTS:
+${test_output}
+
+Provide your review. End with either:
+APPROVED
+or
+REJECTED
+{reason}"
+
+      bash "$SCRIPT_DIR/piharness.sh" task "$review_surface" "$review_prompt"
+      bash "$SCRIPT_DIR/piharness.sh" wait "$review_surface" --timeout "$pipeline_timeout" || true
+
+      review_output=$(grep -v -E '__PIHARNESS_DONE__|__PIHARNESS_ERROR__' \
+        "$(_outfile "$review_surface")" 2>/dev/null || true)
+
+      if echo "$review_output" | grep -qiE '^APPROVED$|^APPROVED[[:space:]]'; then
+        echo ""
+        echo "Pipeline APPROVED after $round round(s)."
+        exit 0
+      elif echo "$review_output" | grep -qiE '^REJECTED'; then
+        feedback=$(echo "$review_output" | grep -iA9999 '^REJECTED' | tail -n +2 | head -c 1000 || true)
+        echo "Round $round: REJECTED. Feedback: ${feedback:0:200}"
+      else
+        echo "Round $round: reviewer output did not contain APPROVED or REJECTED — treating as rejection."
+        feedback=$(echo "$review_output" | tail -c 1000 || true)
+      fi
+
+      round=$(( round + 1 ))
+    done
+
+    echo "Pipeline stalled after $pipeline_rounds rounds without approval." >&2
+    exit 1
+    ;;
+
+  # ---------------------------------------------------------------------------
+  orchestrate)
+  # Usage: piharness orchestrate <surface> <task>
+  # Run a task on the orchestrator-role worker (or any worker if none designated).
+  # Supports PIHARNESS_ORCHESTRATOR env var to override runtime for orchestration.
+  # ---------------------------------------------------------------------------
+    [[ $# -lt 2 ]] && { echo "Usage: piharness orchestrate <surface> <task>" >&2; exit 1; }
+    orch_surface="$1"; orch_task="$2"
+
+    # If surface is "auto", find the orchestrator-role surface
+    if [[ "$orch_surface" == "auto" ]]; then
+      orch_surface=$(_registry_first_role "orchestrator")
+      if [[ -z "$orch_surface" ]]; then
+        orch_surface=$(_registry_first_role "worker")
+      fi
+      if [[ -z "$orch_surface" ]]; then
+        echo "ERROR: no orchestrator or worker surface found in registry" >&2
+        exit 1
+      fi
+    fi
+
+    # If PIHARNESS_ORCHESTRATOR is set, temporarily override the runtime index
+    if [[ -n "${PIHARNESS_ORCHESTRATOR:-}" ]]; then
+      # Find the index of the requested runtime in the chain
+      override_idx=0
+      found_idx=""
+      while IFS= read -r entry; do
+        if [[ "$entry" == "$PIHARNESS_ORCHESTRATOR" ]]; then
+          found_idx="$override_idx"
+          break
+        fi
+        override_idx=$(( override_idx + 1 ))
+      done < <(echo "$RUNTIME_CHAIN" | tr ',' '\n')
+      if [[ -n "$found_idx" ]]; then
+        _rt_set_idx "$orch_surface" "$found_idx"
+        echo "Orchestrate: overriding runtime to $PIHARNESS_ORCHESTRATOR (idx=$found_idx)"
+      else
+        echo "WARNING: PIHARNESS_ORCHESTRATOR='$PIHARNESS_ORCHESTRATOR' not found in chain, using current runtime" >&2
+      fi
+    fi
+
+    bash "$SCRIPT_DIR/piharness.sh" task "$orch_surface" "$orch_task"
+    ;;
+
+  # ---------------------------------------------------------------------------
+  handoff)
+  # Usage: piharness handoff [--runtime TYPE:MODEL] [--task "what to continue"]
+  #
+  # Snapshot current orchestration state and hand off to a different AI runtime
+  # (Pi, OpenCode, Ollama, Claude) so work continues when the current master
+  # orchestrator (e.g. Claude Code) hits its token/session limit.
+  # The new orchestrator is launched interactively with a full briefing.
+  # ---------------------------------------------------------------------------
+    handoff_runtime="${PIHARNESS_ORCHESTRATOR:-}"
+    handoff_task="Continue orchestrating the workers toward task completion."
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --runtime) handoff_runtime="$2"; shift 2 ;;
+        --task)    handoff_task="$2";    shift 2 ;;
+        *) echo "Unknown arg: $1" >&2; exit 1 ;;
+      esac
+    done
+
+    if [[ -z "$handoff_runtime" ]]; then
+      echo "ERROR: specify --runtime TYPE:MODEL or set PIHARNESS_ORCHESTRATOR" >&2
+      echo "  Examples:" >&2
+      echo "    piharness handoff --runtime ollama:qwen2.5-coder:7b" >&2
+      echo "    piharness handoff --runtime pi:kilo-auto/free" >&2
+      echo "    piharness handoff --runtime opencode:anthropic/claude-haiku-4-5" >&2
+      exit 1
+    fi
+
+    # ── Build state snapshot ──────────────────────────────────────────────────
+    state_snap="CURRENT WORKERS:\n"
+    if [[ -s "$REGISTRY" ]]; then
+      while IFS=$'\t' read -r surf lbl cwd wt br start_epoch role; do
+        status=$(_worker_status "$surf")
+        runtime=$(_rt_current "$surf")
+        state_snap+="  $surf  role=${role:-worker}  status=$status  runtime=${runtime}  branch=${br:-none}  label=$lbl\n"
+        outfile="$(_outfile "$surf")"
+        if [[ -f "$outfile" ]]; then
+          recent=$(grep -v -E '__PIHARNESS_DONE__|__PIHARNESS_ERROR__' "$outfile" \
+                   2>/dev/null | tail -8 | cut -c1-120 | tr '\n' '|' || true)
+          [[ -n "$recent" ]] && state_snap+="    recent: ${recent}\n"
+        fi
+      done < "$REGISTRY"
+    else
+      state_snap+="  (none)\n"
+    fi
+
+    # ── Build handoff prompt ──────────────────────────────────────────────────
+    harness_path="$SCRIPT_DIR/piharness.sh"
+    handoff_prompt="You are taking over as the PIHARNESS orchestrator. The previous master orchestrator hit its token limit and has handed control to you.
+
+CONTINUATION TASK: ${handoff_task}
+
+$(printf '%b' "$state_snap")
+YOUR SHELL TOOLS (run these in the terminal):
+  bash ${harness_path} status                        # see all workers + statuses
+  bash ${harness_path} task <surface> \"<prompt>\"    # send work to a worker
+  bash ${harness_path} wait <surface>                # block until worker finishes
+  bash ${harness_path} collect <surface>             # read worker output
+  bash ${harness_path} peek <surface>                # partial output mid-run
+  bash ${harness_path} pipeline \"<task>\"            # full impl→test→review loop
+  bash ${harness_path} spawn --role implementer      # spawn new worker
+  bash ${harness_path} screen <surface>              # capture live pane
+  bash ${harness_path} diff <s1> <s2>               # git diff worktree branches
+  bash ${harness_path} close <surface>              # close worker pane
+
+INSTRUCTIONS:
+1. Run status first: bash ${harness_path} status
+2. Continue the task above using the registered workers.
+3. When complete, commit each worktree and output: HANDOFF COMPLETE"
+
+    tmpfile=$(mktemp /tmp/piharness_handoff.XXXXXX)
+    printf '%s' "$handoff_prompt" > "$tmpfile"
+
+    # ── Spawn new pane ────────────────────────────────────────────────────────
+    split_from=$(cat "$LAST_SURFACE_FILE" 2>/dev/null || echo "")
+    if [[ -n "$split_from" ]]; then
+      raw=$(cmux new-split down --surface "$split_from" --focus false 2>&1)
+    else
+      raw=$(cmux new-split right --focus false 2>&1)
+    fi
+    new_surface=$(printf '%s' "$raw" | grep -oE 'surface:[0-9]+' | head -1)
+    if [[ -z "$new_surface" ]]; then
+      echo "ERROR: could not spawn handoff pane: $raw" >&2
+      rm -f "$tmpfile"; exit 1
+    fi
+
+    start_epoch=$(date +%s)
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$new_surface" "orch-handoff" "$SCRIPT_DIR" "" "" "$start_epoch" "orchestrator" >> "$REGISTRY"
+    echo "$new_surface" > "$LAST_SURFACE_FILE"
+
+    cmux send --surface "$new_surface" "cd $(printf '%q' "$SCRIPT_DIR")"$'\n' >/dev/null
+    sleep 0.5
+
+    # ── Launch the new orchestrator runtime ───────────────────────────────────
+    htype=$(_rt_type "$handoff_runtime")
+    hmodel=$(_rt_model "$handoff_runtime")
+    case "$htype" in
+      pi)
+        cmux send --surface "$new_surface" \
+          "pi --model $(printf '%q' "$hmodel") \"$(cat "$tmpfile")\""$'\n' >/dev/null
+        ;;
+      opencode)
+        local_mf=""
+        [[ "$hmodel" != "auto" ]] && local_mf="-m $(printf '%q' "$hmodel")"
+        cmux send --surface "$new_surface" "opencode $local_mf"$'\n' >/dev/null
+        sleep 2
+        # Send the briefing as first message
+        cmux send --surface "$new_surface" "$(cat "$tmpfile")"$'\n' >/dev/null
+        ;;
+      ollama)
+        cmux send --surface "$new_surface" \
+          "ollama run $(printf '%q' "$hmodel") \"$(cat "$tmpfile")\""$'\n' >/dev/null
+        ;;
+      claude)
+        local_mf=""
+        [[ "$hmodel" != "default" ]] && local_mf="--model $(printf '%q' "$hmodel")"
+        cmux send --surface "$new_surface" "claude $local_mf"$'\n' >/dev/null
+        sleep 2
+        cmux send --surface "$new_surface" "$(cat "$tmpfile")"$'\n' >/dev/null
+        ;;
+      *)
+        echo "ERROR: unknown runtime type: $htype" >&2
+        rm -f "$tmpfile"; exit 1 ;;
+    esac
+
+    rm -f "$tmpfile"
+    _log "$new_surface" "HANDOFF" "runtime=$handoff_runtime task=${handoff_task:0:80}"
+
+    echo ""
+    echo "Handoff initiated."
+    echo "  New orchestrator : $handoff_runtime"
+    echo "  Pane             : $new_surface"
+    echo "  Task             : ${handoff_task:0:80}"
+    echo ""
+    echo "Monitor it: bash $harness_path screen $new_surface"
     ;;
 
   # ---------------------------------------------------------------------------
@@ -545,19 +858,19 @@ case "$cmd" in
   # ---------------------------------------------------------------------------
     if [[ ! -s "$REGISTRY" ]]; then echo "No registered workers."; exit 0; fi
     echo ""
-    printf '%-14s %-16s %-9s %-10s %-30s %s\n' \
-      "SURFACE" "LABEL" "STATUS" "ELAPSED" "RUNTIME" "LAST OUTPUT"
-    printf '%-14s %-16s %-9s %-10s %-30s %s\n' \
-      "───────" "─────" "──────" "───────" "───────" "───────────"
-    while IFS=$'\t' read -r surf lbl cwd wt br start_epoch; do
+    printf '%-14s %-16s %-9s %-10s %-14s %-30s %s\n' \
+      "SURFACE" "LABEL" "STATUS" "ELAPSED" "ROLE" "RUNTIME" "LAST OUTPUT"
+    printf '%-14s %-16s %-9s %-10s %-14s %-30s %s\n' \
+      "───────" "─────" "──────" "───────" "────" "───────" "───────────"
+    while IFS=$'\t' read -r surf lbl cwd wt br start_epoch role; do
       outfile="$(_outfile "$surf")"
       status=$(_worker_status "$surf")
       elapsed=$(_elapsed "${start_epoch:-0}")
       runtime=$(_rt_current "$surf")
       last=$(grep -v -E '__PIHARNESS_DONE__|__PIHARNESS_ERROR__' "$outfile" 2>/dev/null \
              | grep -v '^$' | tail -1 | cut -c1-40 || echo "-")
-      printf '%-14s %-16s %-9s %-10s %-30s %s\n' \
-        "$surf" "$lbl" "$status" "$elapsed" "${runtime:0:30}" "${last:--}"
+      printf '%-14s %-16s %-9s %-10s %-14s %-30s %s\n' \
+        "$surf" "$lbl" "$status" "$elapsed" "${role:-worker}" "${runtime:0:30}" "${last:--}"
     done < "$REGISTRY"
     echo ""
     ;;
@@ -589,15 +902,15 @@ case "$cmd" in
   list)
   # ---------------------------------------------------------------------------
     if [[ ! -s "$REGISTRY" ]]; then echo "No registered workers."; exit 0; fi
-    printf '%-14s %-16s %-9s %-30s %-30s %s\n' \
-      "SURFACE" "LABEL" "STATUS" "RUNTIME" "CWD" "BRANCH"
-    printf '%-14s %-16s %-9s %-30s %-30s %s\n' \
-      "───────" "─────" "──────" "───────" "───" "──────"
-    while IFS=$'\t' read -r surf lbl cwd wt br start_epoch; do
+    printf '%-14s %-16s %-9s %-14s %-30s %-30s %s\n' \
+      "SURFACE" "LABEL" "STATUS" "ROLE" "RUNTIME" "CWD" "BRANCH"
+    printf '%-14s %-16s %-9s %-14s %-30s %-30s %s\n' \
+      "───────" "─────" "──────" "────" "───────" "───" "──────"
+    while IFS=$'\t' read -r surf lbl cwd wt br start_epoch role; do
       status=$(_worker_status "$surf")
       runtime=$(_rt_current "$surf")
-      printf '%-14s %-16s %-9s %-30s %-30s %s\n' \
-        "$surf" "$lbl" "$status" "${runtime:0:30}" "${cwd:0:30}" "${br:-none}"
+      printf '%-14s %-16s %-9s %-14s %-30s %-30s %s\n' \
+        "$surf" "$lbl" "$status" "${role:-worker}" "${runtime:0:30}" "${cwd:0:30}" "${br:-none}"
     done < "$REGISTRY"
     ;;
 
@@ -655,8 +968,8 @@ case "$cmd" in
 piharness - orchestrate Pi/OpenCode/Ollama/Claude workers via cmux
 
 Spawn / Register:
-  spawn  [--cwd DIR] [--label L] [--worktree] [--branch B]
-  use    <surface> [--label L]
+  spawn  [--cwd DIR] [--label L] [--worktree] [--branch B] [--role ROLE]
+  use    <surface> [--label L] [--role ROLE]
 
 Runtime:
   start   <surface> [--runtime TYPE:MODEL] [--continue]   Start interactive runtime
@@ -671,11 +984,11 @@ Task lifecycle:
   peek    <surface>                  Print partial output (mid-run ok)
 
 Observability:
-  status                             Dashboard: runtime, status, elapsed, last line
+  status                             Dashboard: runtime, status, elapsed, role, last line
   screen  <surface>                  Live pane capture
   watch   <surface>                  Stream output file (tail -f)
   log     <surface>                  Structured event log
-  list                               Table of workers and runtimes
+  list                               Table of workers, roles, and runtimes
   monitor <surface> [--daemon]       Auto-switch monitor (background watchdog)
 
 Comparison:
@@ -686,11 +999,19 @@ Cleanup:
   close  <surface> [--keep-worktree]
   clean
 
+Role-based pipeline:
+  spawn --role implementer|tester|reviewer|orchestrator
+  pipeline <task> [--rounds N] [--timeout N]   Run full impl→test→review cycle
+  orchestrate <surface> <task>                  Run task on orchestrator worker
+  handoff [--runtime TYPE:MODEL] [--task "..."] Hand off master orchestration to
+                                                 another AI when Claude Code runs out
+
 Env:
-  PIHARNESS_DIR       State dir (default: ~/.piharness)
-  PIHARNESS_REPO      Git repo for worktrees (default: script dir)
-  PIHARNESS_RUNTIMES  Comma-sep runtime chain (TYPE:MODEL,...)
-  PIHARNESS_MAX_WORKERS  Max concurrent workers (default: 3)
+  PIHARNESS_DIR            State dir (default: ~/.piharness)
+  PIHARNESS_REPO           Git repo for worktrees (default: script dir)
+  PIHARNESS_RUNTIMES       Comma-sep runtime chain (TYPE:MODEL,...)
+  PIHARNESS_MAX_WORKERS    Max concurrent workers (default: 3)
+  PIHARNESS_ORCHESTRATOR   Runtime to use for orchestrator role (overrides chain)
 
 Default runtime chain:
   pi:nvidia/nemotron-3-ultra-550b-a55b:free
