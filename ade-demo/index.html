@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADE - Agentic Development Environment</title>
+<style>
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #1c2333;
+  --bg-card: #1a1f2e;
+  --bg-terminal: #0a0e14;
+  --border: #2d3548;
+  --border-light: #3d4760;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent-blue: #58a6ff;
+  --accent-green: #3fb950;
+  --accent-purple: #bc8cff;
+  --accent-orange: #d29922;
+  --accent-red: #f85149;
+  --accent-cyan: #39d2c0;
+  --agent-fe: #58a6ff;
+  --agent-be: #3fb950;
+  --agent-mcp: #bc8cff;
+  --agent-review: #d29922;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.4);
+  --radius: 8px;
+  --radius-sm: 4px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  display: flex; flex-direction: column;
+}
+
+/* TOP BAR */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px; height: 44px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+.logo { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.logo-accent { color: var(--accent-blue); }
+.topbar-right { display: flex; align-items: center; gap: 16px; }
+.status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; }
+.status-dot.online { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+.status-item { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; }
+.status-item strong { color: var(--text-primary); margin: 0 2px; }
+
+/* MAIN LAYOUT */
+.main-layout { display: flex; flex: 1; overflow: hidden; }
+.panes-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.panes-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8px; padding: 8px; }
+
+/* SIDEBAR */
+.sidebar {
+  width: 280px; flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted); font-weight: 600;
+}
+.bus-messages { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.bus-msg {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+  animation: msgSlide 0.3s ease-out;
+  border-left: 3px solid var(--text-muted);
+}
+.bus-msg .msg-time { font-size: 10px; color: var(--text-muted); font-family: 'SF Mono', 'Cascadia Code', monospace; }
+.bus-msg .msg-route { color: var(--text-secondary); margin: 2px 0; }
+.bus-msg .msg-route .from { color: var(--accent-blue); }
+.bus-msg .msg-route .arrow { color: var(--text-muted); }
+.bus-msg .msg-route .to { color: var(--accent-green); }
+.bus-msg .msg-text { color: var(--text-primary); margin-top: 2px; font-size: 11px; line-height: 1.4; }
+.bus-msg.type-task { border-left-color: var(--accent-blue); }
+.bus-msg.type-review { border-left-color: var(--accent-orange); }
+.bus-msg.type-context { border-left-color: var(--accent-purple); }
+.bus-msg.type-status { border-left-color: var(--accent-green); }
+.bus-msg.type-approval { border-left-color: var(--accent-cyan); }
+
+@keyframes msgSlide { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+
+/* AGENT CARDS */
+.agent-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: flex; flex-direction: column;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+}
+.agent-card:hover { border-color: var(--border-light); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+.agent-card.expanded { grid-column: 1 / -1; grid-row: 1 / -1; z-index: 10; }
+.agent-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.agent-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; flex-shrink: 0;
+}
+.agent-avatar.fe { background: rgba(88,166,255,0.15); color: var(--agent-fe); }
+.agent-avatar.be { background: rgba(63,185,80,0.15); color: var(--agent-be); }
+.agent-avatar.mcp { background: rgba(188,140,255,0.15); color: var(--agent-mcp); }
+.agent-avatar.rv { background: rgba(210,146,34,0.15); color: var(--agent-review); }
+.agent-info { flex: 1; min-width: 0; }
+.agent-name { font-size: 13px; font-weight: 600; }
+.agent-role { font-size: 11px; color: var(--text-muted); }
+.agent-status-badge {
+  font-size: 10px; padding: 2px 8px; border-radius: 10px;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.agent-status-badge.working { background: rgba(88,166,255,0.15); color: var(--accent-blue); }
+.agent-status-badge.thinking { background: rgba(210,146,34,0.15); color: var(--accent-orange); }
+.agent-status-badge.done { background: rgba(63,185,80,0.15); color: var(--accent-green); }
+.agent-status-badge.idle { background: rgba(139,148,158,0.15); color: var(--text-muted); }
+
+.agent-task { font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; line-height: 1.4; }
+.progress-track { height: 3px; background: var(--bg-tertiary); border-radius: 2px; overflow: hidden; margin-bottom: 8px; }
+.progress-fill { height: 100%; border-radius: 2px; transition: width 0.3s; width: 0%; }
+.progress-fill.fe { background: var(--agent-fe); }
+.progress-fill.be { background: var(--agent-be); }
+.progress-fill.mcp { background: var(--agent-mcp); }
+.progress-fill.rv { background: var(--agent-review); }
+
+.agent-logs {
+  flex: 1; min-height: 0;
+  background: var(--bg-terminal);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-y: auto;
+  color: var(--text-muted);
+}
+.agent-logs .log-line { white-space: nowrap; }
+.agent-logs .log-line .ts { color: var(--text-muted); }
+.agent-logs .log-line .msg { color: var(--text-secondary); }
+.agent-logs .log-line .highlight { color: var(--text-primary); }
+
+/* TERMINAL PANEL */
+.terminal-panel {
+  height: 150px; flex-shrink: 0;
+  background: var(--bg-terminal);
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column;
+}
+.terminal-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.terminal-bar span { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.terminal-toggle { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 3px; }
+.terminal-toggle:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.terminal-body {
+  flex: 1; overflow-y: auto;
+  padding: 6px 12px;
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 11px; line-height: 1.6;
+}
+.terminal-body .t-line { white-space: pre-wrap; word-break: break-all; }
+.terminal-body .t-line .t-ts { color: #6e7681; }
+.terminal-body .t-line .t-prefix { font-weight: 600; }
+.terminal-body .t-line .t-prefix.fe { color: var(--agent-fe); }
+.terminal-body .t-line .t-prefix.be { color: var(--agent-be); }
+.terminal-body .t-line .t-prefix.mcp { color: var(--agent-mcp); }
+.terminal-body .t-line .t-prefix.rv { color: var(--agent-review); }
+.terminal-body .t-line .t-text { color: var(--text-secondary); }
+
+.terminal-panel.collapsed { height: 32px; }
+.terminal-panel.collapsed .terminal-body { display: none; }
+
+/* KNOWLEDGE GRAPH mini */
+.knowledge-mini {
+  border-top: 1px solid var(--border);
+  height: 120px;
+  background: var(--bg-primary);
+  display: flex; align-items: center; justify-content: center;
+}
+.knowledge-mini canvas { width: 100%; height: 100%; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* Responsive */
+@media (max-width: 800px) {
+  .sidebar { display: none; }
+  .panes-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo"><span class="logo-accent">ADE</span> Agent Studio</div>
+  </div>
+  <div class="topbar-right">
+    <span class="status-item"><span class="status-dot online"></span> <strong id="agentCount">4</strong>/4 Online</span>
+    <span class="status-item" id="uptimeDisplay">Uptime: 0s</span>
+    <span class="status-item"><strong id="msgCount">0</strong> messages</span>
+  </div>
+</div>
+
+<div class="main-layout">
+  <div class="panes-area">
+    <div class="panes-grid" id="agentGrid">
+      <!-- Agent cards injected by JS -->
+    </div>
+    <div class="terminal-panel" id="terminalPanel">
+      <div class="terminal-bar">
+        <span>Terminal Output</span>
+        <button class="terminal-toggle" id="termToggle">-</button>
+      </div>
+      <div class="terminal-body" id="terminalBody"></div>
+    </div>
+    <div class="knowledge-mini" id="knowledgeMini">
+      <canvas id="kgCanvas"></canvas>
+    </div>
+  </div>
+  <div class="sidebar">
+    <div class="sidebar-header">Agent Bus</div>
+    <div class="bus-messages" id="busMessages"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+'use strict';
+
+// ─── AGENTS ───────────────────────────────────────────────────────────
+const AGENTS = [
+  { id: 'fe',  name: 'Frontend', role: 'Vue / UI', color: 'var(--agent-fe)',  avatar: 'fe', tasks: [
+      'Building WorkspaceView layout grid',
+      'Implementing agent card components',
+      'Styling PanesView state transitions',
+      'Adding TerminalPane xterm integration',
+      'Wiring AgentsView to MCP bus',
+      'Polishing dark theme variables',
+      'Fixing ContextView reactivity',
+      'Optimizing Vite dev build',
+    ]},
+  { id: 'be',  name: 'Backend', role: 'Rust / Tauri', color: 'var(--agent-be)',  avatar: 'be', tasks: [
+      'Compiling PTY session manager',
+      'Implementing cmux_run bridge',
+      'Building workspace snapshot command',
+      'Adding error recovery to lib.rs',
+      'Refactoring PtyManager lifecycle',
+      'Writing mcp_send transport layer',
+      'Fixing Tauri invoke serialization',
+      'Adding session resume logic',
+    ]},
+  { id: 'mcp', name: 'MCP Server', role: 'Python / Context', color: 'var(--agent-mcp)', avatar: 'mcp', tasks: [
+      'Processing agent_bus_publish tool',
+      'Indexing workspace context nodes',
+      'Handling diagnostics_report request',
+      'Persisting decision log entries',
+      'Executing context://workspace query',
+      'Running memory_search across sessions',
+      'Generating workspace_snapshot',
+      'Updating agent_bus_poll endpoint',
+    ]},
+  { id: 'rv',  name: 'Review', role: 'QA / Audit', color: 'var(--agent-review)', avatar: 'rv', tasks: [
+      'Reviewing Frontend PR #142',
+      'Auditing unsafe Rust blocks',
+      'Checking MCP tool error paths',
+      'Verifying cross-agent message flow',
+      'Running type checks on Vue views',
+      'Validating PTY session cleanup',
+      'Reviewing knowledge graph schema',
+      'Testing agent bus race conditions',
+    ]},
+];
+
+const CARD_COLS = ['fe', 'be', 'mcp', 'rv'];
+
+// ─── STATE ────────────────────────────────────────────────────────────
+const state = {
+  agents: AGENTS.map(a => ({
+    ...a,
+    status: 'working',
+    taskIdx: Math.floor(Math.random() * a.tasks.length),
+    progress: 0,
+    logs: [],
+    taskCycle: 0,
+  })),
+  busMessages: [],
+  terminalLines: [],
+  msgCount: 0,
+  startTime: Date.now(),
+  termCollapsed: false,
+  expandedAgent: null,
+  kgNodes: [],
+  kgEdges: [],
+  frame: 0,
+};
+
+// ─── KNOWLEDGE GRAPH DATA ─────────────────────────────────────────────
+function initKG() {
+  state.kgNodes = [
+    { id: 0, label: 'Workspace',  x: 0, y: 0, r: 12 },
+    { id: 1, label: 'Agent Bus',  x: 0, y: 0, r: 10 },
+    { id: 2, label: 'Context DB', x: 0, y: 0, r: 10 },
+    { id: 3, label: 'Frontend',   x: 0, y: 0, r: 8 },
+    { id: 4, label: 'Backend',    x: 0, y: 0, r: 8 },
+    { id: 5, label: 'MCP Server', x: 0, y: 0, r: 8 },
+    { id: 6, label: 'Terminal',   x: 0, y: 0, r: 7 },
+    { id: 7, label: 'Knowledge',  x: 0, y: 0, r: 7 },
+    { id: 8, label: 'PtyManager', x: 0, y: 0, r: 7 },
+    { id: 9, label: 'cmux',       x: 0, y: 0, r: 7 },
+  ];
+  const adj = [
+    [0,1],[0,6],[0,7],[1,3],[1,4],[1,5],[2,5],[2,7],[3,6],[4,8],[4,9],[5,2],[7,2],[8,9]
+  ];
+  state.kgEdges = adj.map(([s,t]) => ({ source: s, target: t }));
+  // random initial positions
+  const cx = 120, cy = 50, spread = 80;
+  state.kgNodes.forEach((n,i) => {
+    const a = (i / state.kgNodes.length) * Math.PI * 2 + 0.3;
+    n.x = cx + Math.cos(a) * spread * (0.5 + Math.random() * 0.5);
+    n.y = cy + Math.sin(a) * spread * (0.5 + Math.random() * 0.5);
+    n.vx = 0; n.vy = 0;
+  });
+}
+
+// ─── AGENT LOG & TERMINAL LINES ───────────────────────────────────────
+const LOG_TEMPLATES = {
+  fe: [
+    'Rendering component tree', 'Updating reactive state', 'Compiling SFC modules',
+    'Bundling with Vite', 'HMR update received', 'Stylelint passed',
+    'Type check: 0 errors', 'Building dist bundle',
+  ],
+  be: [
+    'cargo check: 0 warnings', 'Running Tauri build', 'PTY session allocated',
+    'cmux socket connected', 'Command serialized', 'Session state persisted',
+    'Worker thread spawned', 'Signal handler registered',
+  ],
+  mcp: [
+    'Tool call: memory_search', 'Context window updated', 'Decision logged to DB',
+    'Bus message dispatched', 'Resource: context://workspace', 'Snapshot generated',
+    'Poll cycle complete', 'Tool: diagnostics_report',
+  ],
+  rv: [
+    'Review: no critical issues', 'Checking concurrency model', 'Audit: safe',
+    'PR #142 approved', 'Lint: all clear', 'Testing edge cases',
+    'Benchmark: within threshold', 'Review: minor style nit',
+  ],
+};
+
+const TERMINAL_TEMPLATES = [
+  '[{ts}] \x01fe\x01[Frontend] Building WorkspaceView layout grid...',
+  '[{ts}] \x01be\x01[Backend] Compiling PTY session manager with portable-pty...',
+  '[{ts}] \x01mcp\x01[MCP] Processing agent_bus_publish tool request',
+  '[{ts}] \x01rv\x01[Review] Reviewing Frontend PR #142 - checking prop types',
+  '[{ts}] \x01fe\x01[Frontend] Implementing agent card components with transitions',
+  '[{ts}] \x01be\x01[Backend] cargo check passed - 0 warnings, 0 errors',
+  '[{ts}] \x01fe\x01[Frontend] Adding TerminalPane xterm integration',
+  '[{ts}] \x01mcp\x01[MCP] Indexing workspace context nodes - 47 nodes processed',
+  '[{ts}] \x01be\x01[Backend] Implementing cmux_run bridge for workspace control',
+  '[{ts}] \x01rv\x01[Review] Checking MCP tool error paths - all handled',
+  '[{ts}] \x01mcp\x01[MCP] Persisting decision log to context.db',
+  '[{ts}] \x01be\x01[Backend] Adding error recovery to lib.rs - retry with backoff',
+  '[{ts}] \x01fe\x01[Frontend] Polishing dark theme CSS variables',
+  '[{ts}] \x01rv\x01[Review] Auditing unsafe Rust blocks in pty.rs - 0 issues',
+  '[{ts}] \x01mcp\x01[MCP] Running memory_search across 3 active sessions',
+  '[{ts}] \x01be\x01[Backend] Refactoring PtyManager lifecycle - adding cleanup',
+  '[{ts}] \x01fe\x01[Frontend] Fixing ContextView reactivity with deep watchers',
+  '[{ts}] \x01rv\x01[Review] Verifying cross-agent message flow on bus',
+  '[{ts}] \x01mcp\x01[MCP] Generating workspace_snapshot for current state',
+  '[{ts}] \x01be\x01[Backend] Writing mcp_send transport layer with framing',
+];
+
+const BUS_TEMPLATES = [
+  { type: 'task', from: 0, to: 2, text: 'Requesting context data for WorkspaceView' },
+  { type: 'task', from: 0, to: 1, text: 'Need session list for agent status panel' },
+  { type: 'context', from: 2, to: 0, text: 'Returning 12 workspace nodes with metadata' },
+  { type: 'status', from: 1, to: 3, text: 'Session #4: PTY write completed successfully' },
+  { type: 'review', from: 3, to: 0, text: 'Approving PR #142 - component props verified' },
+  { type: 'task', from: 1, to: 2, text: 'Persist session snapshot to context DB' },
+  { type: 'context', from: 2, to: 1, text: 'Session snapshot stored at key ses_snap_4' },
+  { type: 'approval', from: 3, to: 1, text: 'Unsafe blocks reviewed - changes permitted' },
+  { type: 'task', from: 0, to: 2, text: 'Search memory for terminal pane patterns' },
+  { type: 'status', from: 2, to: 3, text: 'All 4 agent heartbeats received - healthy' },
+  { type: 'review', from: 3, to: 2, text: 'MCP error paths need consistent logging' },
+  { type: 'approval', from: 3, to: 0, text: 'CSS variable changes approved - no regressions' },
+];
+
+const BUS_AGENTS = ['Frontend', 'Backend', 'MCP Server', 'Review'];
+
+function rand(n) { return Math.floor(Math.random() * n); }
+function pick(arr) { return arr[rand(arr.length)]; }
+function clamp(v,min,max) { return Math.max(min, Math.min(max, v)); }
+
+function ts() {
+  const d = new Date();
+  return d.toTimeString().slice(0,8);
+}
+
+// ─── UPDATE AGENTS ────────────────────────────────────────────────────
+function updateAgents() {
+  for (const a of state.agents) {
+    a.progress += 0.004 + Math.random() * 0.008;
+    if (a.progress >= 1) {
+      a.progress = 0;
+      a.taskIdx = (a.taskIdx + 1 + rand(2)) % a.tasks.length;
+      a.taskCycle++;
+      a.status = rand(5) === 0 ? 'thinking' : 'working';
+      if (a.taskCycle % 3 === 0) a.status = 'done';
+    } else if (a.progress > 0.7 && Math.random() < 0.005) {
+      a.status = 'thinking';
+    } else if (a.progress > 0.9 && Math.random() < 0.01) {
+      a.status = 'done';
+    } else if (Math.random() < 0.002) {
+      a.status = 'working';
+    }
+
+    if (Math.random() < 0.04) {
+      const tpl = pick(LOG_TEMPLATES[a.id]);
+      a.logs.push(tpl);
+      if (a.logs.length > 50) a.logs.shift();
+    }
+  }
+}
+
+// ─── BUS MESSAGE ──────────────────────────────────────────────────────
+function maybeBusMessage() {
+  if (Math.random() > 0.015) return;
+  const tpl = pick(BUS_TEMPLATES);
+  let fromName = BUS_AGENTS[tpl.from];
+  let toName = BUS_AGENTS[tpl.to];
+  // occasionally vary
+  if (Math.random() < 0.2) {
+    const shuffled = BUS_AGENTS.slice().sort(() => Math.random() - 0.5);
+    fromName = shuffled[0];
+    toName = shuffled[1];
+  }
+  state.busMessages.push({
+    time: ts(),
+    type: tpl.type,
+    from: fromName,
+    to: toName,
+    text: tpl.text,
+    id: state.msgCount++,
+  });
+  if (state.busMessages.length > 100) state.busMessages.shift();
+}
+
+// ─── TERMINAL LINE ────────────────────────────────────────────────────
+function maybeTerminalLine() {
+  if (Math.random() > 0.025) return;
+  const tpl = pick(TERMINAL_TEMPLATES);
+  const line = tpl.replace('{ts}', ts());
+  state.terminalLines.push(line);
+  if (state.terminalLines.length > 500) state.terminalLines.shift();
+}
+
+// ─── RENDER AGENTS ────────────────────────────────────────────────────
+function renderAgents() {
+  const grid = document.getElementById('agentGrid');
+  let html = '';
+  for (const a of state.agents) {
+    const task = a.tasks[a.taskIdx];
+    const pct = Math.round(clamp(a.progress, 0, 1) * 100);
+    const logLines = a.logs.slice(-3).map(l =>
+      `<div class="log-line"><span class="msg">${l}</span></div>`
+    ).join('');
+    html += `
+      <div class="agent-card" data-agent="${a.id}" onclick="ADE.expandAgent('${a.id}')">
+        <div class="agent-header">
+          <div class="agent-avatar ${a.avatar}">${a.name[0]}</div>
+          <div class="agent-info">
+            <div class="agent-name">${a.name}</div>
+            <div class="agent-role">${a.role}</div>
+          </div>
+          <span class="agent-status-badge ${a.status}">${a.status}</span>
+        </div>
+        <div class="agent-task">${task}</div>
+        <div class="progress-track">
+          <div class="progress-fill ${a.id}" style="width:${pct}%"></div>
+        </div>
+        <div class="agent-logs">${logLines || '<div class="log-line"><span class="msg">Initializing...</span></div>'}</div>
+      </div>
+    `;
+  }
+  grid.innerHTML = html;
+}
+
+// ─── RENDER BUS ───────────────────────────────────────────────────────
+function renderBus() {
+  const container = document.getElementById('busMessages');
+  let html = '';
+  const msgs = state.busMessages.slice(-30);
+  for (const m of msgs) {
+    html += `
+      <div class="bus-msg type-${m.type}">
+        <div class="msg-time">${m.time}</div>
+        <div class="msg-route">
+          <span class="from">${m.from}</span>
+          <span class="arrow"> → </span>
+          <span class="to">${m.to}</span>
+        </div>
+        <div class="msg-text">${m.text}</div>
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+  container.scrollTop = container.scrollHeight;
+  document.getElementById('msgCount').textContent = state.msgCount;
+}
+
+// ─── RENDER TERMINAL ──────────────────────────────────────────────────
+function renderTerminal() {
+  const body = document.getElementById('terminalBody');
+  let html = '';
+  const lines = state.terminalLines.slice(-80);
+  for (const line of lines) {
+    const tsMatch = line.match(/^\[([^\]]+)\]/);
+    const time = tsMatch ? tsMatch[1] : '';
+    const rest = line.replace(/^\[[^\]]+\]\s*/, '');
+    // parse agent prefix markers
+    let prefix = '', text = rest, colorClass = '';
+    const match = rest.match(/^\x01(\w+)\x01\[([^\]]+)\]\s*/);
+    if (match) {
+      prefix = match[2];
+      colorClass = match[1];
+      text = rest.substring(match[0].length);
+    }
+    html += `<div class="t-line"><span class="t-ts">[${time}]</span> <span class="t-prefix ${colorClass}">[${prefix}]</span> <span class="t-text">${text}</span></div>`;
+  }
+  body.innerHTML = html;
+  body.scrollTop = body.scrollHeight;
+}
+
+// ─── RENDER KNOWLEDGE GRAPH ───────────────────────────────────────────
+function renderKG() {
+  const canvas = document.getElementById('kgCanvas');
+  if (!canvas) return;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = canvas.parentElement.clientWidth || 280;
+  canvas.height = canvas.parentElement.clientHeight || 120;
+
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const nodes = state.kgNodes;
+  const edges = state.kgEdges;
+
+  // simple force simulation
+  const k = 0.02, rep = 800, att = 0.001;
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      let dx = nodes[j].x - nodes[i].x;
+      let dy = nodes[j].y - nodes[i].y;
+      let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      let f = rep / (dist * dist);
+      nodes[i].vx -= f * dx / dist * k;
+      nodes[i].vy -= f * dy / dist * k;
+      nodes[j].vx += f * dx / dist * k;
+      nodes[j].vy += f * dy / dist * k;
+    }
+  }
+  for (const e of edges) {
+    const s = nodes[e.source], t = nodes[e.target];
+    const dx = t.x - s.x, dy = t.y - s.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const f = (dist - 40) * att;
+    s.vx += f * dx / dist * k;
+    s.vy += f * dy / dist * k;
+    t.vx -= f * dx / dist * k;
+    t.vy -= f * dy / dist * k;
+  }
+  for (const n of nodes) {
+    n.x += n.vx; n.y += n.vy;
+    n.vx *= 0.9; n.vy *= 0.9;
+    n.x = clamp(n.x, 15, W - 15);
+    n.y = clamp(n.y, 15, H - 15);
+  }
+
+  // draw edges
+  ctx.strokeStyle = '#2d3548';
+  ctx.lineWidth = 1;
+  for (const e of edges) {
+    const s = nodes[e.source], t = nodes[e.target];
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(t.x, t.y);
+    ctx.stroke();
+  }
+
+  // draw nodes
+  for (const n of nodes) {
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+    const colors = ['#58a6ff','#3fb950','#bc8cff','#d29922','#39d2c0','#f85149','#58a6ff','#3fb950','#bc8cff','#d29922'];
+    ctx.fillStyle = colors[n.id % colors.length] + '33';
+    ctx.fill();
+    ctx.strokeStyle = colors[n.id % colors.length];
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    if (n.r > 6) {
+      ctx.fillStyle = '#e6edf3';
+      ctx.font = '6px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(n.label, n.x, n.y + 2);
+    }
+  }
+}
+
+// ─── UPTIME ───────────────────────────────────────────────────────────
+function renderUptime() {
+  const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  document.getElementById('uptimeDisplay').textContent = `Uptime: ${m}m ${s}s`;
+}
+
+// ─── MAIN LOOP ────────────────────────────────────────────────────────
+function tick() {
+  state.frame++;
+  updateAgents();
+  maybeBusMessage();
+  maybeTerminalLine();
+  renderAgents();
+  renderBus();
+  renderTerminal();
+  renderKG();
+  renderUptime();
+  requestAnimationFrame(tick);
+}
+
+// ─── EXPAND AGENT ─────────────────────────────────────────────────────
+window.ADE = {
+  expandAgent: function(id) {
+    const cards = document.querySelectorAll('.agent-card');
+    cards.forEach(c => {
+      if (c.dataset.agent === id) {
+        c.classList.toggle('expanded');
+      } else {
+        c.classList.remove('expanded');
+      }
+    });
+  }
+};
+
+// ─── TERMINAL TOGGLE ──────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  const toggle = document.getElementById('termToggle');
+  const panel = document.getElementById('terminalPanel');
+  toggle.addEventListener('click', function() {
+    panel.classList.toggle('collapsed');
+    toggle.textContent = panel.classList.contains('collapsed') ? '+' : '-';
+  });
+});
+
+// ─── START ────────────────────────────────────────────────────────────
+initKG();
+tick();
+
+})();
+</script>
+</body>
+</html>
