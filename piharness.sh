@@ -130,11 +130,25 @@ case "$cmd" in
     tmpfile=$(mktemp /tmp/piharness_prompt.XXXXXX)
     printf '%s' "$prompt" > "$tmpfile"
 
-    cmux send --surface "$surface" \
-      "pi --print \"\$(cat $(printf '%q' "$tmpfile"))\" \
+    # Check if this worker has a worktree so we can auto-commit after task
+    worktree=$(_registry_get "$surface" 4)
+    branch=$(_registry_get "$surface" 5)
+
+    if [[ -n "$worktree" ]]; then
+      cmux send --surface "$surface" \
+        "pi --print \"\$(cat $(printf '%q' "$tmpfile"))\" \
+> $(printf '%q' "$outfile") 2>&1; \
+git -C $(printf '%q' "$worktree") add -A 2>/dev/null; \
+git -C $(printf '%q' "$worktree") commit -m 'feat: task output' --allow-empty 2>/dev/null; \
+echo '__PIHARNESS_DONE__' >> $(printf '%q' "$outfile"); \
+rm -f $(printf '%q' "$tmpfile")"$'\n' >/dev/null
+    else
+      cmux send --surface "$surface" \
+        "pi --print \"\$(cat $(printf '%q' "$tmpfile"))\" \
 > $(printf '%q' "$outfile") 2>&1; \
 echo '__PIHARNESS_DONE__' >> $(printf '%q' "$outfile"); \
 rm -f $(printf '%q' "$tmpfile")"$'\n' >/dev/null
+    fi
 
     _log "$surface" "TASK_SENT" "${prompt:0:100}"
     echo "Task sent → $outfile"
