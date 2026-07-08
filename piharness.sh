@@ -63,9 +63,8 @@ _elapsed() {
 
 _cmux_surface_healthy() {
   local surf="$1"; [[ -z "$surf" ]] && return 1
-  local h; h=$(cmux surface-health --surface "$surf" 2>&1) || true
-  echo "$h" | grep -qiE 'not found|error|no such surface' && return 1
-  return 0
+  cmux tree --all 2>/dev/null | grep -qE "surface:${surf#surface:}[^0-9]" && return 0
+  return 1
 }
 
 _cmux_label_tab() { cmux rename-tab --surface "$1" "🔧${2}" 2>/dev/null || true; }
@@ -1981,83 +1980,73 @@ else:
   help|*)
   # ---------------------------------------------------------------------------
     cat <<'EOF'
-piharness - orchestrate Pi/OpenCode/Ollama/Claude workers via cmux
+piharness — AI worker orchestration for Pi / OpenCode / Gemini / Codex / Claude via cmux
 
-Spawn / Register:
-  spawn  [--cwd DIR] [--label L] [--worktree] [--branch B] [--role ROLE]
-  use    <surface> [--label L] [--role ROLE]
+Usage: ./piharness.sh <command> [args]
 
-Runtime:
-  start   <surface> [--runtime TYPE:MODEL] [--continue]   Start interactive runtime
-  switch  <surface> [--next | --runtime TYPE:MODEL]        Switch runtime in pane
-  runtimes [<surface>]                                     Show chain + current
+── GETTING STARTED ────────────────────────────────────────────────────────
+  status                  # dashboard — see all workers, runtimes, status
+  spawn --label NAME      # create a new worker pane (add --worktree for git isolation)
+  run "<prompt>"          # run a task on the most available worker (smart default)
+  close <surface>         # close a worker when done
 
-Task lifecycle:
-  task    <surface> <prompt>               Fire-and-forget task (uses current runtime)
-  auto    <surface> <prompt> [--timeout N] [--no-cooldown]
-                                           Task with intelligent auto-switch on failure.
-                                           Detects rate limits, tracks per-runtime usage,
-                                           and retries the best runtime after cooldown.
-                                           This is the main command for reliable execution.
-  wait    <surface> [--timeout N]          Block until done
-  collect <surface>                        Print final output
-  peek    <surface>                        Print partial output (mid-run ok)
+── COMMON TASKS ───────────────────────────────────────────────────────────
+  run    "<prompt>"              best-available worker, auto runtime fallback
+  task   <surface> "<prompt>"     send task to a specific worker
+  auto   <surface> "<prompt>"     task + auto-runtime-switch on failure
+  collect <surface>               read worker output (running or complete)
+  wait   <surface> [--timeout N]  block until worker finishes
 
-Observability:
-  status                                   Dashboard: runtime, status, elapsed, role, last line
-  screen  <surface>                        Live pane capture
-  watch   <surface>                        Stream output file (tail -f)
-  log     <surface>                        Structured event log
-  list                                     Table of workers, roles, and runtimes
-  monitor <surface> [--daemon]             Auto-switch monitor (background watchdog)
+── EXAMPLES ───────────────────────────────────────────────────────────────
+  ./piharness.sh spawn --label build --worktree       # spawn isolated worker
+  ./piharness.sh status                                 # see all workers
+  ./piharness.sh run "test the build"                   # run task anywhere
+  ./piharness.sh task surface:46 "deploy to staging"    # target a specific worker
+  ./piharness.sh collect surface:46                     # read the output
+  ./piharness.sh pipeline "add login" --rounds 3        # impl→test→review cycle
 
-Usage tracking (runtime health database):
-  usage stats                              Per-runtime success/failure/limit stats
-  usage prune                              Prune entries older than 7 days
+── WORKER MANAGEMENT ──────────────────────────────────────────────────────
+  spawn    [--cwd DIR] [--label L] [--worktree] [--branch B] [--role ROLE]
+  use      <surface> [--label L] [--role ROLE]         register existing pane
+  close    <surface> [--keep-worktree]                 exit and clean up
+  start    <surface> [--runtime TYPE:MODEL]            launch interactive AI in pane
+  switch   <surface> [--next | --runtime TYPE:MODEL]   change runtime in a pane
 
-Self-evolution (overnight skill extraction):
-  self-evolve [--dry-run] [--min-cluster N]
-                                           Auto-extract skills from task pattern clusters.
-                                           Run nightly to build the skill library.
-  nightly                                  Full maintenance: self-evolve + prune + stale
-                                           worker cleanup + summary report
-  skill list                               List installed skills
-  skill show <name>                        Show skill details (+ usage count)
-  skill new <name> [--pattern P]           Create skill scaffold
-  skill extract <surface> [--name N]       Create skill from worker output
-  skill suggest                            Suggest skills from task patterns
+── PIPELINES & ORCHESTRATION ─────────────────────────────────────────────
+  pipeline   "<task>" [--rounds N]         impl→test→review cycle
+  supervise  "<task>" [--timeout N]        long-running with auto handoff
+  handoff    [--runtime R] [--task "..."]  hand off orchestrator to another AI
 
-Learning & pattern detection:
-  learn track <desc> [--surface S]         Log a task for pattern detection
-  learn history [--limit N]                Show recent task history
-  learn suggest                            Suggest new skills from repeated patterns
+── OBSERVABILITY ──────────────────────────────────────────────────────────
+  status [--verbose]          worker dashboard (use --verbose for details)
+  screen    <surface>         live pane capture
+  watch     <surface>         stream output (tail -f)
+  log       <surface>         structured event log
+  compare   <s1> <s2>         side-by-side worker output
+  diff      <s1> <s2>         git diff between worktree branches
+  monitor   <surface> [--daemon]   auto-switch watchdog
 
-Cleanup:
-  close  <surface> [--keep-worktree]
-  clean
+── RUNTIME MANAGEMENT ────────────────────────────────────────────────────
+  runtimes [<surface>]          show fallback chain
+  usage stats                   per-runtime success/failure/limit dashboard
+  usage prune                   clean old usage data (>7d)
 
-Role-based pipeline:
-  spawn --role implementer|tester|reviewer|orchestrator
-  pipeline <task> [--rounds N] [--timeout N]   Run full impl→test→review cycle
-  orchestrate <surface> <task>                  Run task on orchestrator worker
-  handoff [--runtime TYPE:MODEL] [--task "..."] Hand off master orchestration to
-                                                 another AI when Claude Code runs out
+── SELF-EVOLUTION ─────────────────────────────────────────────────────────
+  skill       list|show|new|extract|suggest   manage skill library
+  learn       track|history|suggest            pattern detection
+  self-evolve [--dry-run]                     auto-extract skills from task patterns
+  nightly                                      full overnight maintenance
 
-Env:
-  PIHARNESS_DIR            State dir (default: ~/.piharness)
-  PIHARNESS_REPO           Git repo for worktrees (default: script dir)
-  PIHARNESS_RUNTIMES       Comma-sep runtime chain (TYPE:MODEL,...)
-  PIHARNESS_MAX_WORKERS    Max concurrent workers (default: 3)
-  PIHARNESS_ORCHESTRATOR   Runtime to use for orchestrator role (overrides chain)
+── CLEANUP ────────────────────────────────────────────────────────────────
+  clean   reset all state (keeps panes open)
 
-Default runtime chain (auto-detected tools):
-  pi:kilo-auto/free
-  opencode:anthropic/claude-haiku-4-5
-  gemini:gemini-2.5-flash
-  codex:default
-  droid:default
-  ollama:qwen2.5-coder:7b
-  claude:default
+── ENVIRONMENT ────────────────────────────────────────────────────────────
+  PIHARNESS_DIR          State dir (default: ~/.piharness)
+  PIHARNESS_RUNTIMES     Comma-sep runtime chain
+  PIHARNESS_MAX_WORKERS  Max concurrent workers (default: 3)
+  PIHARNESS_ORCHESTRATOR Runtime for orchestrator role
+
+Default chain: pi:kilo-auto/free → opencode → gemini → codex → droid → ollama → claude
 EOF
     ;;
 esac

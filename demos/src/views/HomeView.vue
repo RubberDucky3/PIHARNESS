@@ -15,7 +15,7 @@ const demoCommands = [
   { prompt: '', text: '├──────────┼─────────┼────────┤' },
   { prompt: '', text: '│ worker-a │ running │ kilo   │' },
   { prompt: '', text: '│ worker-b │ idle    │ kilo   │' },
-  { prompt: '', text: '└──────────┴─────────┴────────┘' },
+  { prompt: '└──────────┴─────────┴────────┘' },
   { prompt: '$', text: './piharness.sh usage stats' },
   { prompt: 'ℹ', text: 'Requests: 47 | Success: 44 (93.6%) | Avg: 3.2s' },
 ]
@@ -27,42 +27,47 @@ const demoCommands = [
     <section class="hero">
       <div class="hero-content">
         <div class="hero-badge">v1.0 — AI Worker Orchestrator</div>
-        <h1 class="hero-title">Ship code <span class="accent">while you sleep</span></h1>
+        <h1 class="hero-title">Ship AI tasks <span class="accent">while you sleep</span></h1>
         <p class="hero-subtitle">
-          Orchestrate multiple AI agents (Pi, OpenCode, Gemini, Codex, Claude) across cmux panes
-          with automatic fallback, self-healing runtimes, and overnight self-evolution.
+          Route work across 6 runtimes with automatic fallback. Self-healing, self-evolving, overnight-ready.
         </p>
         <div class="hero-actions">
           <router-link to="/demos" class="btn btn-primary">Watch Demos</router-link>
           <router-link to="/commands" class="btn btn-secondary">Commands</router-link>
+          <a href="https://github.com/your-org/PIHARNESS" target="_blank" class="btn btn-secondary">GitHub ↗</a>
         </div>
       </div>
-
-      <!-- Terminal preview -->
       <AnimatedTerminal :commands="demoCommands" />
+    </section>
+
+    <!-- Stats -->
+    <section class="stats">
+      <div class="stat"><div class="stat-number">6</div><div class="stat-label">Runtimes</div></div>
+      <div class="stat"><div class="stat-number">7</div><div class="stat-label">Demos</div></div>
+      <div class="stat"><div class="stat-number">20+</div><div class="stat-label">Commands</div></div>
     </section>
 
     <!-- Features -->
     <section class="features">
       <div class="section-header">
         <h2>Why PIHARNESS?</h2>
-        <p>Designed for developers who want maximum throughput from their AI tools.</p>
+        <p>Maximum throughput from your AI tools.</p>
       </div>
-
       <div class="feature-grid">
-        <FeatureCard icon="⚡" title="Multi-Runtime Fallback" description="Tasks auto-fall through Pi → OpenCode → Gemini → Codex → Claude. When one hits rate limits, the next picks up." />
-        <FeatureCard icon="🔄" title="Self-Evolution" description="The system watches your task patterns and auto-extracts reusable skills. It gets smarter the more you use it." />
-        <FeatureCard icon="🌙" title="Overnight Sessions" description="Start a supervised session before bed. PIHARNESS works through the night, handing off between runtimes as needed." />
-        <FeatureCard icon="📊" title="Real-Time Dashboard" description="See every worker's status, model, and output — all from a single cmux terminal window." />
-        <FeatureCard icon="🧠" title="Role-Based Pipelines" description="Split work across implementer, tester, and reviewer agents. Each role gets its own isolated worktree." />
-        <FeatureCard icon="🔧" title="Intelligent Recovery" description="Detects rate limits, token limits, quota exhaustion, and timeouts — sets cooldowns and retries automatically." />
+        <FeatureCard icon="⚡" title="Multi-Runtime Fallback" description="Tasks auto-fall through Pi → OpenCode → Gemini → Codex → Claude." />
+        <FeatureCard icon="🔄" title="Self-Evolution" description="Auto-extracts reusable skills from your task patterns." />
+        <FeatureCard icon="🌙" title="Overnight Sessions" description="Start supervised sessions before bed. Works through the night." />
+        <FeatureCard icon="📊" title="Real-Time Dashboard" description="See every worker's status, model, and output in one terminal." />
+        <FeatureCard icon="🧠" title="Role-Based Pipelines" description="Split work across implementer, tester, and reviewer agents." />
+        <FeatureCard icon="🔧" title="Intelligent Recovery" description="Detects rate limits, token limits, and timeouts — retries automatically." />
       </div>
     </section>
 
     <!-- Quick Start -->
     <section class="quickstart">
       <div class="section-header">
-        <h2>Get Started in 30 Seconds</h2>
+        <h2>Quick Start</h2>
+        <p>Copy-paste these commands to spin up your first worker.</p>
       </div>
       <div class="code-block">
         <div class="code-header">Terminal</div>
@@ -70,7 +75,10 @@ const demoCommands = [
 <span class="prompt">$</span> cd PIHARNESS
 <span class="prompt">$</span> ./piharness.sh spawn --label worker-a --worktree
 <span class="green">✓</span> Spawned worker-a
-<span class="prompt">$</span> ./piharness.sh auto surface:1 "Build a CLI tool in Python"</code></pre>
+<span class="prompt">$</span> ./piharness.sh auto surface:1 "Build a CLI tool in Python"
+<span class="prompt">$</span> ./piharness.sh status
+<span class="prompt">$</span> ./piharness.sh collect surface:1
+<span class="prompt">$</span> ./piharness.sh close surface:1</code></pre>
       </div>
     </section>
   </div>
@@ -149,6 +157,32 @@ const demoCommands = [
 
 .btn-secondary:hover { background: var(--bg-active); }
 
+/* Stats */
+.stats {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* Features */
 .features {
   max-width: 1200px;
@@ -208,6 +242,9 @@ const demoCommands = [
   color: #c9d1d9;
 }
 
+.prompt { color: #ff7b72; }
+.green { color: #3fb950; }
+
 @media (max-width: 800px) {
   .hero {
     grid-template-columns: 1fr;
@@ -217,5 +254,6 @@ const demoCommands = [
   .hero-title { font-size: 2rem; }
   .hero-actions { flex-direction: column; }
   .btn { text-align: center; justify-content: center; }
+  .stats { grid-template-columns: repeat(3, 1fr); }
 }
 </style>
