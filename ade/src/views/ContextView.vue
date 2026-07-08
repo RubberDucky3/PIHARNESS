@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 
 const tab = ref('memory')
 const loading = ref(false)
@@ -18,14 +19,14 @@ const showDecisionForm = ref(false)
 const diagnosticsResult = ref('')
 
 async function callTool(name, args = {}) {
-  return await window.__TAURI_INTERNALS__.invoke('ade_mcp_call_tool', {
+  return await invoke('ade_mcp_call_tool', {
     name,
     args: JSON.stringify(args)
   })
 }
 
 async function readResource(uri) {
-  return await window.__TAURI_INTERNALS__.invoke('ade_mcp_read_resource', { uri })
+  return await invoke('ade_mcp_read_resource', { uri })
 }
 
 function extractText(result) {

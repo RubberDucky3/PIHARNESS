@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 
 const darkTheme = ref(true)
 const deps = ref(null)
@@ -9,7 +10,7 @@ const pingResult = ref('')
 
 async function checkDeps() {
   try {
-    const result = await window.__TAURI_INTERNALS__.invoke('check_deps')
+    const result = await invoke('check_deps')
     deps.value = typeof result === 'string' ? JSON.parse(result) : result
   } catch {
     deps.value = { cmux: false, ade_mcp: false, version: 'unknown' }
@@ -21,7 +22,7 @@ async function testMcpConnection() {
   error.value = ''
   pingResult.value = ''
   try {
-    const result = await window.__TAURI_INTERNALS__.invoke('ade_mcp_list_tools')
+    const result = await invoke('ade_mcp_list_tools')
     const parsed = JSON.parse(result)
     const tools = parsed?.result?.tools || []
     pingResult.value = `Connected (${tools.length} tools available)`

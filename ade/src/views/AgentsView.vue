@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 
 const loading = ref(false)
 const error = ref('')
@@ -11,7 +12,7 @@ const sessions = ref([])
 const activeTab = ref('bus')
 
 async function callTool(name, args = {}) {
-  const result = await window.__TAURI_INTERNALS__.invoke('ade_mcp_call_tool', {
+  const result = await invoke('ade_mcp_call_tool', {
     name,
     args: JSON.stringify(args)
   })

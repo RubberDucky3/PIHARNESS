@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 import TerminalPane from '../components/TerminalPane.vue'
 
 const loading = ref(true)
@@ -34,7 +35,7 @@ async function loadTree() {
   loading.value = true
   error.value = ''
   try {
-    const raw = await window.__TAURI_INTERNALS__.invoke('cmux_tree_json')
+    const raw = await invoke('cmux_tree_json')
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
     treeData.value = parsed
     connected.value = true
@@ -60,7 +61,7 @@ async function createWorkspace() {
   const ts = Date.now()
   const args = `workspace create --name "ADE-${ts}"`
   try {
-    await window.__TAURI_INTERNALS__.invoke('cmux_run', { args })
+    await invoke('cmux_run', { args })
     await loadTree()
   } catch (e) {
     const errMsg = typeof e === 'object' && e !== null
