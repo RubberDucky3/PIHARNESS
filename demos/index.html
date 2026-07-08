@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PIHARNESS — AI Worker Orchestrator</title>
+
+  <!-- Asciinema Player -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/asciinema-player@3/dist/asciinema-player.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/asciinema-player@3/dist/asciinema-player.min.js"></script>
+
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Typography ── */
+    h1 { font-size: 3rem; font-weight: 800; letter-spacing: -0.02em; }
+    h2 { font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; }
+    h3 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; }
+    p  { color: #8b949e; max-width: 640px; }
+    a  { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      background: #161b22;
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    pre { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+
+    /* ── Layout ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem; }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 5rem 0 3rem;
+      text-align: center;
+      background: linear-gradient(180deg, #0d1117 0%, #161b22 100%);
+      border-bottom: 1px solid #30363d;
+    }
+    .hero h1 {
+      background: linear-gradient(135deg, #58a6ff, #3fb950);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero .tagline {
+      font-size: 1.2rem;
+      color: #8b949e;
+      margin: 1rem auto 1.5rem;
+    }
+    .hero .badges {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      padding: 0.35rem 1rem;
+      font-size: 0.85rem;
+      color: #c9d1d9;
+    }
+    .badge .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot.green  { background: #3fb950; }
+    .dot.blue   { background: #58a6ff; }
+    .dot.orange { background: #d29922; }
+    .dot.purple { background: #bc8cff; }
+
+    /* ── Section ── */
+    .section { padding: 4rem 0; }
+    .section-title { text-align: center; margin-bottom: 3rem; }
+    .section-title p { margin: 0.5rem auto 0; font-size: 1.1rem; }
+
+    /* ── Features Grid ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+    .feature-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 1.5rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .feature-card:hover {
+      border-color: #58a6ff;
+      transform: translateY(-2px);
+    }
+    .feature-card .icon { font-size: 1.75rem; margin-bottom: 0.75rem; }
+    .feature-card h3 { color: #e6edf3; }
+    .feature-card p  { font-size: 0.9rem; margin-top: 0.25rem; }
+
+    /* ── Demo Grid ── */
+    .demo-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2.5rem;
+    }
+    .demo-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .demo-card-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid #30363d;
+    }
+    .demo-card-header .num {
+      display: inline-block;
+      background: #21262d;
+      border-radius: 12px;
+      padding: 0.1rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #58a6ff;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+    .demo-card-header h3 { display: inline; vertical-align: middle; }
+    .demo-card-header .desc {
+      font-size: 0.9rem;
+      color: #8b949e;
+      margin-top: 0.35rem;
+    }
+    .demo-card .asciinema-wrap {
+      padding: 1rem 1rem 0.75rem;
+      position: relative;
+    }
+    .demo-card .asciinema-wrap asciinema-player {
+      display: block;
+      max-width: 100%;
+      margin: 0 auto;
+    }
+
+    /* ── Commands Table ── */
+    .commands-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    .commands-table th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      background: #21262d;
+      border-bottom: 2px solid #30363d;
+      color: #8b949e;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+    .commands-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #21262d;
+    }
+    .commands-table tr:hover td { background: #1c2128; }
+    .commands-table td:first-child { font-family: 'SF Mono', monospace; color: #58a6ff; white-space: nowrap; }
+
+    /* ── Runtime Chain ── */
+    .chain {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin: 2rem 0;
+    }
+    .chain-item {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 0.4rem 0.9rem;
+      font-family: 'SF Mono', monospace;
+      font-size: 0.8rem;
+      color: #c9d1d9;
+      white-space: nowrap;
+    }
+    .chain-arrow { color: #484f58; font-size: 1.2rem; }
+
+    /* ── Footer ── */
+    .footer {
+      border-top: 1px solid #30363d;
+      padding: 2rem 0;
+      text-align: center;
+      color: #484f58;
+      font-size: 0.85rem;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      h1 { font-size: 2rem; }
+      h2 { font-size: 1.5rem; }
+      .hero { padding: 3rem 0 2rem; }
+      .features-grid { grid-template-columns: 1fr; }
+      .chain-item { font-size: 0.7rem; padding: 0.3rem 0.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="container">
+    <h1>PIHARNESS</h1>
+    <p class="tagline">Self-evolving AI worker orchestrator. Fallback across 7 runtimes, overnight skill extraction, role-based pipelines — all from your terminal.</p>
+    <div class="badges">
+      <span class="badge"><span class="dot green"></span> MIT License</span>
+      <span class="badge"><span class="dot blue"></span> 7 Runtime Chain</span>
+      <span class="badge"><span class="dot orange"></span> Self-Evolving</span>
+      <span class="badge"><span class="dot purple"></span> 10+ Skills</span>
+    </div>
+    <div class="chain" style="margin-top:1.5rem">
+      <span class="chain-item">pi:kilo-auto</span>
+      <span class="chain-arrow">→</span>
+      <span class="chain-item">opencode:haiku</span>
+      <span class="chain-arrow">→</span>
+      <span class="chain-item">gemini:flash</span>
+      <span class="chain-arrow">→</span>
+      <span class="chain-item">codex</span>
+      <span class="chain-arrow">→</span>
+      <span class="chain-item">droid</span>
+      <span class="chain-arrow">→</span>
+      <span class="chain-item">ollama</span>
+      <span class="chain-arrow">→</span>
+      <span class="chain-item">claude</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FEATURES ═══ -->
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-title">
+      <h2>Features</h2>
+      <p>Everything you need to orchestrate AI coding agents at scale.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="icon">🔁</div>
+        <h3>Multi-Runtime Fallback</h3>
+        <p>Tasks fall through 7 AI backends when one hits rate limits. Intelligent cooldowns and best-runtime selection.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🧠</div>
+        <h3>Self-Evolution</h3>
+        <p>Watches task patterns and auto-extracts reusable skills from clusters of 3+ similar tasks. Runs overnight via <code>nightly</code>.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">👷</div>
+        <h3>Role-Based Pipeline</h3>
+        <p>Spawne implementer, tester, and reviewer workers — run a full pipeline with a single command using <code>pipeline</code>.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🔄</div>
+        <h3>Orchestrator Supervision</h3>
+        <p>Long-running tasks auto-handoff to the next runtime when token limits are hit. State is preserved across handoffs.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📊</div>
+        <h3>Usage Analytics</h3>
+        <p>Per-runtime health dashboard: success rates, latency, last used. Data drives intelligent fallback decisions.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📦</div>
+        <h3>Skill System</h3>
+        <p>Capture patterns as reusable skills with trigger patterns, descriptions, and version tracking. List, show, and suggest.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ DEMOS ═══ -->
+<section class="section" id="demos" style="background:#161b22;border-top:1px solid #30363d;border-bottom:1px solid #30363d">
+  <div class="container">
+    <div class="section-title">
+      <h2>Live Demos</h2>
+      <p>Real terminal recordings of PIHARNESS in action. Press ▶ to play each demo.</p>
+    </div>
+
+    <div class="demo-grid">
+
+      <!-- Demo 1 -->
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <span class="num">01</span><h3>Spawn + Auto Task</h3>
+          <div class="desc">Spawn a worker and send a task with automatic runtime fallback — the core workflow.</div>
+        </div>
+        <div class="asciinema-wrap">
+          <asciinema-player src="recordings/demo-01-spawn-auto.cast" cols="100" rows="30" idle-time-limit="2" font-size="12px" theme="dracula" autoplay="false" loop="false" preload="true"></asciinema-player>
+        </div>
+      </div>
+
+      <!-- Demo 2 -->
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <span class="num">02</span><h3>Status Dashboard</h3>
+          <div class="desc">Monitor all registered workers, their status, roles, and runtime assignments.</div>
+        </div>
+        <div class="asciinema-wrap">
+          <asciinema-player src="recordings/demo-02-status.cast" cols="100" rows="30" idle-time-limit="2" font-size="12px" theme="dracula" autoplay="false" preload="true"></asciinema-player>
+        </div>
+      </div>
+
+      <!-- Demo 3 -->
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <span class="num">03</span><h3>Role-Based Pipeline</h3>
+          <div class="desc">Spawn implementer, tester, and reviewer workers, then run a full implementation pipeline.</div>
+        </div>
+        <div class="asciinema-wrap">
+          <asciinema-player src="recordings/demo-03-pipeline.cast" cols="100" rows="30" idle-time-limit="2" font-size="12px" theme="dracula" autoplay="false" preload="true"></asciinema-player>
+        </div>
+      </div>
+
+      <!-- Demo 4 -->
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <span class="num">04</span><h3>Self-Evolve + Nightly</h3>
+          <div class="desc">Extract skills from repeated task patterns and run overnight maintenance.</div>
+        </div>
+        <div class="asciinema-wrap">
+          <asciinema-player src="recordings/demo-04-self-evolve.cast" cols="100" rows="30" idle-time-limit="2" font-size="12px" theme="dracula" autoplay="false" preload="true"></asciinema-player>
+        </div>
+      </div>
+
+      <!-- Demo 5 -->
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <span class="num">05</span><h3>Orchestrator Supervision</h3>
+          <div class="desc">Run long tasks with auto-handoff when the runtime hits token limits.</div>
+        </div>
+        <div class="asciinema-wrap">
+          <asciinema-player src="recordings/demo-05-supervise.cast" cols="100" rows="30" idle-time-limit="2" font-size="12px" theme="dracula" autoplay="false" preload="true"></asciinema-player>
+        </div>
+      </div>
+
+      <!-- Demo 6 -->
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <span class="num">06</span><h3>Usage Statistics</h3>
+          <div class="desc">Per-runtime health dashboard showing success rates, latency, and last-used times.</div>
+        </div>
+        <div class="asciinema-wrap">
+          <asciinema-player src="recordings/demo-06-usage.cast" cols="100" rows="30" idle-time-limit="2" font-size="12px" theme="dracula" autoplay="false" preload="true"></asciinema-player>
+        </div>
+      </div>
+
+      <!-- Demo 7 -->
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <span class="num">07</span><h3>Skills System</h3>
+          <div class="desc">List installed skills, view their contents, and preview suggested skill extractions.</div>
+        </div>
+        <div class="asciinema-wrap">
+          <asciinema-player src="recordings/demo-07-skill-list.cast" cols="100" rows="30" idle-time-limit="2" font-size="12px" theme="dracula" autoplay="false" preload="true"></asciinema-player>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ COMMANDS ═══ -->
+<section class="section" id="commands">
+  <div class="container">
+    <div class="section-title">
+      <h2>Commands</h2>
+      <p>Full command reference for PIHARNESS.</p>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="commands-table">
+        <thead>
+          <tr><th>Command</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>spawn [--role R]</td><td>Spawn a worker pane (optionally with a role)</td></tr>
+          <tr><td>task &lt;s&gt; &lt;prompt&gt;</td><td>One-shot task on a specific worker</td></tr>
+          <tr><td>auto &lt;s&gt; &lt;prompt&gt;</td><td>Task with automatic runtime fallback</td></tr>
+          <tr><td>supervise &lt;task&gt;</td><td>Long-running orchestrator with auto-handoff</td></tr>
+          <tr><td>pipeline &lt;task&gt;</td><td>Implement → test → review pipeline loop</td></tr>
+          <tr><td>handoff [--runtime R]</td><td>Token-limit handoff to the next runtime</td></tr>
+          <tr><td>self-evolve</td><td>Extract skills from task pattern clusters</td></tr>
+          <tr><td>nightly</td><td>Full maintenance: evolve + prune + cleanup</td></tr>
+          <tr><td>usage stats</td><td>Per-runtime health dashboard</td></tr>
+          <tr><td>status</td><td>Worker dashboard</td></tr>
+          <tr><td>skill list</td><td>List installed skills</td></tr>
+          <tr><td>skill show &lt;name&gt;</td><td>Show a skill's full instructions</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ QUICK START ═══ -->
+<section class="section" style="background:#161b22;border-top:1px solid #30363d;text-align:center">
+  <div class="container">
+    <h2>Get Started</h2>
+    <p style="margin:1rem auto 2rem;font-size:1.1rem">
+      Clone the repo and run your first task in seconds.
+    </p>
+    <div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:1.25rem 1.5rem;display:inline-block;text-align:left;max-width:100%;overflow-x:auto">
+      <pre style="color:#c9d1d9;font-size:0.9rem;line-height:1.8">$ git clone https://github.com/RubberDucky3/PIHARNESS.git
+$ cd PIHARNESS
+
+<span style="color:#8b949e"># Spawn a worker and run a task</span>
+$ ./piharness.sh spawn --label my-worker
+$ ./piharness.sh auto my-worker "Build a flappy bird game in Python"
+
+<span style="color:#8b949e"># Run a pipeline</span>
+$ ./piharness.sh pipeline "Add user authentication" --rounds 3
+
+<span style="color:#8b949e"># Overnight self-evolution</span>
+$ ./piharness.sh nightly</pre>
+    </div>
+    <p style="margin-top:1.5rem">
+      <a href="https://github.com/RubberDucky3/PIHARNESS" style="display:inline-flex;align-items:center;gap:0.5rem;background:#21262d;border:1px solid #30363d;border-radius:6px;padding:0.6rem 1.5rem;color:#e6edf3;font-weight:600">
+        <svg height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+        View on GitHub
+      </a>
+    </p>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+  <div class="container">
+    <p>PIHARNESS — MIT License. Built with cmux, Pi, OpenCode, and friends.</p>
+  </div>
+</footer>
+
+</body>
+</html>

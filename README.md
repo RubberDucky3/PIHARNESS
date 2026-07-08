@@ -62,6 +62,30 @@ Once an app is sufficiently developed, capture deployment patterns:
 piharness skill show deploy     # See the deployment pattern
 ```
 
+## Demos
+
+Watch PIHARNESS in action. View the **[interactive demo website](demos/index.html)** with embedded terminal recordings, or play the recordings directly.
+
+| # | Demo | Command | Play Recording |
+|---|------|---------|---------------|
+| 01 | Spawn + Auto Task | `spawn` + `auto` | [`demos/recordings/demo-01-spawn-auto.cast`](demos/recordings/demo-01-spawn-auto.cast) |
+| 02 | Status Dashboard | `status` | [`demos/recordings/demo-02-status.cast`](demos/recordings/demo-02-status.cast) |
+| 03 | Role-Based Pipeline | `pipeline` | [`demos/recordings/demo-03-pipeline.cast`](demos/recordings/demo-03-pipeline.cast) |
+| 04 | Self-Evolve + Nightly | `self-evolve` + `nightly` | [`demos/recordings/demo-04-self-evolve.cast`](demos/recordings/demo-04-self-evolve.cast) |
+| 05 | Orchestrator Supervision | `supervise` | [`demos/recordings/demo-05-supervise.cast`](demos/recordings/demo-05-supervise.cast) |
+| 06 | Usage Statistics | `usage stats` | [`demos/recordings/demo-06-usage.cast`](demos/recordings/demo-06-usage.cast) |
+| 07 | Skills System | `skill list` + `skill show` | [`demos/recordings/demo-07-skill-list.cast`](demos/recordings/demo-07-skill-list.cast) |
+
+To play a recording locally:
+```bash
+asciinema play demos/recordings/demo-01-spawn-auto.cast
+```
+
+To re-record any demo (e.g. with your own terminal theme):
+```bash
+asciinema rec --command "bash demos/demo-01-spawn-auto.sh" demos/recordings/demo-01-spawn-auto.cast
+```
+
 ## Commands
 
 | Command | Description |
