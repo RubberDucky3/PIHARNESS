@@ -41,11 +41,13 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, useSlots } from 'vue'
 
 defineOptions({
   name: 'FeatureCard'
 })
+
+const slots = useSlots()
 
 const props = defineProps({
   icon: {
@@ -103,7 +105,7 @@ const props = defineProps({
 
 const emit = defineEmits(['click'])
 
-const hasBadge = computed(() => Boolean(props.badge) || Boolean(props.$slots.badge))
+const hasBadge = computed(() => Boolean(props.badge) || Boolean(slots.badge))
 
 const clickable = computed(() => !props.disabled && (props.to || props.href))
 
