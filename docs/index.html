@@ -4,312 +4,802 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PIHARNESS — Pi Worker Orchestrator</title>
+  <meta name="description" content="PIHARNESS is a bash-based worker orchestration harness that runs alongside your Claude Code session in cmux." />
+  <meta property="og:title" content="PIHARNESS — Pi Worker Orchestrator" />
+  <meta property="og:description" content="Spawn Pi workers, send tasks, collect output, compare results, and auto-learn from repetitive patterns." />
+  <meta property="og:type" content="website" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; }
-    code, pre { font-family: 'JetBrains Mono', monospace; }
-    .gradient-bg {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0ea5e9 100%);
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          },
+          colors: {
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.5s ease-out',
+            'slide-up': 'slideUp 0.5s ease-out',
+          },
+          keyframes: {
+            fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+            slideUp: { '0%': { opacity: '0', transform: 'translateY(12px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+          },
+        },
+      },
     }
-    .skill-card { transition: transform 0.2s, box-shadow 0.2s; }
-    .skill-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(14,165,233,0.15); }
-    .cmd-code { background: #0f172a; border: 1px solid #1e293b; }
-    .section-link { scroll-margin-top: 80px; }
-    .workflow-arrow { color: #0ea5e9; font-weight: 700; }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+    code, pre, .font-mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    /* Hero gradient */
+    .hero-gradient {
+      background: linear-gradient(135deg, #020617 0%, #0f172a 40%, #1e3a5f 70%, #0ea5e9 100%);
+    }
+    .hero-gradient::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 30% 50%, rgba(14,165,233,0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* Glow effects */
+    .glow-sky { box-shadow: 0 0 20px rgba(14,165,233,0.1); }
+    .glow-sky:hover { box-shadow: 0 0 30px rgba(14,165,233,0.2); }
+
+    /* Section cards */
+    .section-card {
+      background: linear-gradient(135deg, rgba(30,41,59,0.5) 0%, rgba(15,23,42,0.8) 100%);
+      border: 1px solid rgba(51,65,85,0.6);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .section-card:hover {
+      border-color: rgba(14,165,233,0.3);
+      box-shadow: 0 4px 24px rgba(14,165,233,0.06);
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #0a0f1a;
+      border: 1px solid #1e293b;
+      border-radius: 0.75rem;
+      position: relative;
+    }
+    .code-block .copy-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .code-block:hover .copy-btn { opacity: 1; }
+
+    /* Badge styling */
+    .badge { display: inline-flex; align-items: center; padding: 0.125rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+
+    /* Section headers */
+    .section-header {
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+    .section-header::before {
+      content: '';
+      width: 3px; height: 1.5rem; border-radius: 2px;
+      background: linear-gradient(180deg, #0ea5e9, #38bdf8);
+      flex-shrink: 0;
+    }
+
+    /* Anchor offset for fixed nav */
+    .anchor { scroll-margin-top: 5rem; }
+
+    /* Table styling */
+    .param-table td, .param-table th { padding: 0.625rem 1rem; }
+    .param-table tr:not(:last-child) { border-bottom: 1px solid rgba(51,65,85,0.4); }
+
+    /* Inline code */
+    .inline-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+      background: rgba(14,165,233,0.08);
+      color: #7dd3fc;
+      padding: 0.125rem 0.4375rem;
+      border-radius: 0.25rem;
+      border: 1px solid rgba(14,165,233,0.12);
+    }
+
+    /* Terminal simulation */
+    .terminal-prompt::before { content: '$ '; color: #10b981; font-weight: 600; }
+
+    /* Skill cards */
+    .skill-card {
+      background: linear-gradient(135deg, rgba(30,41,59,0.4) 0%, rgba(15,23,42,0.6) 100%);
+      border: 1px solid rgba(51,65,85,0.5);
+      transition: all 0.3s ease;
+    }
+    .skill-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(14,165,233,0.3);
+      box-shadow: 0 8px 32px rgba(14,165,233,0.08);
+    }
+
+    /* Workflow step animation */
+    .wf-step {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      transition: background 0.2s;
+    }
+    .wf-step:hover { background: rgba(14,165,233,0.04); }
+
+    /* Nav link active state */
+    .nav-link { position: relative; }
+    .nav-link::after {
+      content: '';
+      position: absolute; bottom: -2px; left: 0;
+      width: 0; height: 2px;
+      background: #0ea5e9; border-radius: 1px;
+      transition: width 0.3s ease;
+    }
+    .nav-link:hover::after { width: 100%; }
+
+    /* Mobile menu */
+    .mobile-nav { display: none; }
+    @media (max-width: 768px) {
+      .desktop-nav { display: none; }
+      .mobile-nav { display: flex; }
+    }
+
+    /* Copy-to-clipboard feedback */
+    .copied-toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: #065f46; color: #d1fae5;
+      padding: 0.5rem 1rem; border-radius: 0.5rem;
+      font-size: 0.875rem; font-weight: 500;
+      opacity: 0; transform: translateY(8px);
+      transition: all 0.3s ease;
+      pointer-events: none;
+    }
+    .copied-toast.show { opacity: 1; transform: translateY(0); }
+
+    /* Responsive table */
+    @media (max-width: 640px) {
+      .param-table { font-size: 0.8125rem; }
+      .param-table td, .param-table th { padding: 0.5rem 0.75rem; }
+    }
+
+    /* Section reveal animation */
+    .reveal { opacity: 0; transform: translateY(16px); transition: all 0.6s ease-out; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-300">
+<body class="bg-slate-950 text-slate-300 antialiased selection:bg-sky-500/30">
+
   <!-- Nav -->
-  <nav class="fixed top-0 w-full bg-slate-950/90 backdrop-blur border-b border-slate-800 z-50">
-    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center gap-6 text-sm">
-      <span class="font-bold text-white tracking-tight">PIHARNESS</span>
-      <a href="#overview" class="hover:text-white transition-colors">Overview</a>
-      <a href="#commands" class="hover:text-white transition-colors">Commands</a>
-      <a href="#workflow" class="hover:text-white transition-colors">Workflow</a>
-      <a href="#skills" class="hover:text-white transition-colors">Skills</a>
-      <a href="#pipeline" class="hover:text-white transition-colors">Pipeline</a>
-      <a href="#env" class="hover:text-white transition-colors">Config</a>
+  <nav class="fixed top-0 w-full bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/60 z-50">
+    <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-white font-bold tracking-tight text-lg">PIHARNESS</span>
+        <span class="text-xs text-slate-500 hidden sm:inline">v1.0</span>
+      </div>
+      <div class="desktop-nav flex items-center gap-1">
+        <a href="#overview" class="nav-link px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">Overview</a>
+        <a href="#workflow" class="nav-link px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">Workflow</a>
+        <a href="#commands" class="nav-link px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">Commands</a>
+        <a href="#skills" class="nav-link px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">Skills</a>
+        <a href="#architecture" class="nav-link px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">Architecture</a>
+        <a href="#mcp" class="nav-link px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">MCP</a>
+        <a href="#config" class="nav-link px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">Config</a>
+      </div>
+      <div class="mobile-nav">
+        <button onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="p-2 text-slate-400 hover:text-white">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+    </div>
+    <!-- Mobile dropdown -->
+    <div id="mobile-menu" class="hidden border-t border-slate-800/60 bg-slate-950/95 backdrop-blur-xl">
+      <div class="px-4 py-3 space-y-1">
+        <a href="#overview" class="block px-3 py-2 text-sm rounded-lg hover:bg-white/5 text-slate-400 hover:text-white">Overview</a>
+        <a href="#workflow" class="block px-3 py-2 text-sm rounded-lg hover:bg-white/5 text-slate-400 hover:text-white">Workflow</a>
+        <a href="#commands" class="block px-3 py-2 text-sm rounded-lg hover:bg-white/5 text-slate-400 hover:text-white">Commands</a>
+        <a href="#skills" class="block px-3 py-2 text-sm rounded-lg hover:bg-white/5 text-slate-400 hover:text-white">Skills</a>
+        <a href="#architecture" class="block px-3 py-2 text-sm rounded-lg hover:bg-white/5 text-slate-400 hover:text-white">Architecture</a>
+        <a href="#mcp" class="block px-3 py-2 text-sm rounded-lg hover:bg-white/5 text-slate-400 hover:text-white">MCP</a>
+        <a href="#config" class="block px-3 py-2 text-sm rounded-lg hover:bg-white/5 text-slate-400 hover:text-white">Config</a>
+      </div>
     </div>
   </nav>
 
   <!-- Hero -->
-  <header class="gradient-bg pt-24 pb-20 px-6">
-    <div class="max-w-4xl mx-auto text-center">
-      <h1 class="text-5xl font-bold text-white mb-4 tracking-tight">PIHARNESS</h1>
-      <p class="text-xl text-slate-300 mb-3">Pi Worker Orchestrator for Claude Code</p>
-      <p class="text-slate-400 max-w-2xl mx-auto mb-8">
+  <header class="hero-gradient relative pt-28 pb-24 px-6 overflow-hidden">
+    <div class="max-w-4xl mx-auto text-center relative z-10">
+      <div class="inline-flex items-center gap-2 bg-sky-500/10 border border-sky-500/20 rounded-full px-4 py-1.5 mb-6">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-xs font-medium text-sky-300 tracking-wide uppercase">Self-Evolving Orchestrator</span>
+      </div>
+      <h1 class="text-5xl sm:text-6xl font-extrabold text-white mb-4 tracking-tight leading-none">
+        PIHARNESS
+      </h1>
+      <p class="text-xl sm:text-2xl text-slate-300 font-medium mb-4">Pi Worker Orchestrator for Claude Code</p>
+      <p class="text-base text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
         Spawn Pi workers, send tasks, collect output, compare results, and auto-learn
         from repetitive patterns — all from cmux panes alongside your orchestrator session.
       </p>
-      <div class="flex gap-3 justify-center flex-wrap">
-        <code class="cmd-code rounded-lg px-4 py-2 text-sm text-sky-300">./piharness.sh spawn --label worker-a</code>
-        <code class="cmd-code rounded-lg px-4 py-2 text-sm text-sky-300">./piharness.sh task surface:5 "build X"</code>
-        <code class="cmd-code rounded-lg px-4 py-2 text-sm text-sky-300">./piharness.sh skill list</code>
+
+      <!-- Quick commands -->
+      <div class="flex flex-wrap gap-3 justify-center">
+        <div class="code-block px-4 py-2.5 text-sm flex items-center gap-2">
+          <span class="terminal-prompt text-slate-400"></span>
+          <code class="text-sky-300">./piharness.sh spawn --label worker-a</code>
+        </div>
+        <div class="code-block px-4 py-2.5 text-sm flex items-center gap-2">
+          <span class="terminal-prompt text-slate-400"></span>
+          <code class="text-sky-300">./piharness.sh task surface:5 "build X"</code>
+        </div>
+        <div class="code-block px-4 py-2.5 text-sm flex items-center gap-2">
+          <span class="terminal-prompt text-slate-400"></span>
+          <code class="text-sky-300">./piharness.sh skill list</code>
+        </div>
       </div>
     </div>
   </header>
 
-  <main class="max-w-4xl mx-auto px-6 py-12 space-y-20">
+  <!-- Stats bar -->
+  <div class="border-b border-slate-800/60 bg-slate-900/50">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex flex-wrap items-center justify-center gap-8 text-sm">
+      <div class="flex items-center gap-2"><span class="text-slate-500">Skills</span><span class="text-white font-semibold">3</span></div>
+      <div class="flex items-center gap-2"><span class="text-slate-500">Commands</span><span class="text-white font-semibold">18+</span></div>
+      <div class="flex items-center gap-2"><span class="text-slate-500">MCP Tools</span><span class="text-white font-semibold">12</span></div>
+      <div class="flex items-center gap-2"><span class="text-slate-500">Runtime Chain</span><span class="text-white font-semibold">5 tiers</span></div>
+      <div class="flex items-center gap-2"><span class="text-slate-500">Runtime</span><span class="text-white font-semibold">bash</span></div>
+    </div>
+  </div>
+
+  <main class="max-w-6xl mx-auto px-6 py-16 space-y-24">
 
     <!-- Overview -->
-    <section id="overview" class="section-link">
-      <h2 class="text-2xl font-bold text-white mb-6">What is PIHARNESS?</h2>
-      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800 space-y-4">
-        <p>PIHARNESS is a <strong class="text-white">bash-based worker orchestration harness</strong> that runs alongside your Claude Code session in cmux. It manages Pi worker panes so the orchestrator never writes code directly.</p>
-        <div class="grid md:grid-cols-3 gap-4 mt-6">
-          <div class="bg-slate-800/50 rounded-lg p-4">
-            <div class="text-sky-400 font-semibold text-lg mb-1">Plan</div>
-            <p class="text-sm text-slate-400">Break work into parallel slices</p>
+    <section id="overview" class="anchor reveal">
+      <div class="section-header mb-8">
+        <h2 class="text-2xl font-bold text-white">Overview</h2>
+      </div>
+      <div class="section-card rounded-2xl p-8">
+        <p class="text-base leading-relaxed mb-6">
+          PIHARNESS is a <strong class="text-white">bash-based worker orchestration harness</strong> that runs alongside
+          your Claude Code session in cmux. It manages Pi worker panes so the orchestrator never writes code directly —
+          every task is delegated to an isolated worker pane.
+        </p>
+        <div class="grid md:grid-cols-3 gap-5">
+          <div class="bg-slate-800/30 rounded-xl p-5 border border-slate-700/40">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-8 h-8 rounded-lg bg-sky-500/10 flex items-center justify-center">
+                <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+              </div>
+              <div>
+                <div class="text-white font-semibold">Plan</div>
+                <div class="text-xs text-slate-500">Break work into parallel slices</div>
+              </div>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed">Analyze the task, split into independent units, decide worker count and runtime per unit.</p>
           </div>
-          <div class="bg-slate-800/50 rounded-lg p-4">
-            <div class="text-emerald-400 font-semibold text-lg mb-1">Execute</div>
-            <p class="text-sm text-slate-400">Spawn workers, send tasks in parallel</p>
+          <div class="bg-slate-800/30 rounded-xl p-5 border border-slate-700/40">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+              <div>
+                <div class="text-white font-semibold">Execute</div>
+                <div class="text-xs text-slate-500">Spawn workers, send tasks</div>
+              </div>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed">Spawn workers in parallel (max 3), send prompts, wait for completion, collect results.</p>
           </div>
-          <div class="bg-slate-800/50 rounded-lg p-4">
-            <div class="text-purple-400 font-semibold text-lg mb-1">Learn</div>
-            <p class="text-sm text-slate-400">Auto-detect patterns, extract skills</p>
+          <div class="bg-slate-800/30 rounded-xl p-5 border border-slate-700/40">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              </div>
+              <div>
+                <div class="text-white font-semibold">Learn</div>
+                <div class="text-xs text-slate-500">Auto-detect patterns, extract skills</div>
+              </div>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed">Track tasks, detect repetitive patterns, extract reusable skills, grow the system.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Core Workflow -->
-    <section id="workflow" class="section-link">
-      <h2 class="text-2xl font-bold text-white mb-6">Core Workflow</h2>
-      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
-        <div class="flex items-center gap-3 text-sm flex-wrap mb-8">
-          <span class="bg-sky-500/20 text-sky-300 px-3 py-1 rounded-full">1. PLAN</span>
-          <span class="workflow-arrow">→</span>
-          <span class="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full">2. SPAWN</span>
-          <span class="workflow-arrow">→</span>
-          <span class="bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full">3. TASK</span>
-          <span class="workflow-arrow">→</span>
-          <span class="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full">4. WAIT</span>
-          <span class="workflow-arrow">→</span>
-          <span class="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full">5. COLLECT</span>
-          <span class="workflow-arrow">→</span>
-          <span class="bg-rose-500/20 text-rose-300 px-3 py-1 rounded-full">6. COMMIT</span>
+    <!-- Workflow -->
+    <section id="workflow" class="anchor reveal">
+      <div class="section-header mb-8">
+        <h2 class="text-2xl font-bold text-white">Workflow</h2>
+      </div>
+
+      <!-- Pipeline visual -->
+      <div class="section-card rounded-2xl p-8 mb-6">
+        <div class="flex flex-wrap items-center gap-2 text-sm mb-8">
+          <span class="wf-step"><span class="w-7 h-7 rounded-full bg-sky-500/15 text-sky-300 flex items-center justify-center text-xs font-bold">1</span><span class="text-sky-300 font-medium">Plan</span></span>
+          <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          <span class="wf-step"><span class="w-7 h-7 rounded-full bg-emerald-500/15 text-emerald-300 flex items-center justify-center text-xs font-bold">2</span><span class="text-emerald-300 font-medium">Spawn</span></span>
+          <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          <span class="wf-step"><span class="w-7 h-7 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-xs font-bold">3</span><span class="text-amber-300 font-medium">Task</span></span>
+          <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          <span class="wf-step"><span class="w-7 h-7 rounded-full bg-blue-500/15 text-blue-300 flex items-center justify-center text-xs font-bold">4</span><span class="text-blue-300 font-medium">Wait</span></span>
+          <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          <span class="wf-step"><span class="w-7 h-7 rounded-full bg-purple-500/15 text-purple-300 flex items-center justify-center text-xs font-bold">5</span><span class="text-purple-300 font-medium">Collect</span></span>
+          <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          <span class="wf-step"><span class="w-7 h-7 rounded-full bg-rose-500/15 text-rose-300 flex items-center justify-center text-xs font-bold">6</span><span class="text-rose-300 font-medium">Commit</span></span>
         </div>
-        <pre class="text-sm text-slate-300 leading-relaxed"><span class="text-slate-500"># 1. Check current state</span>
-./piharness.sh status
 
-<span class="text-slate-500"># 2. Spawn workers in parallel (max 3)</span>
-./piharness.sh spawn --label impl-structure --worktree
-./piharness.sh spawn --label impl-logic --worktree
+        <pre class="code-block p-5 text-sm leading-relaxed overflow-x-auto"><code><span class="text-slate-600"># 1. Check current state</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh status</span>
 
-<span class="text-slate-500"># 3. Send tasks</span>
-./piharness.sh task surface:5 "Build the HTML structure"
-./piharness.sh task surface:6 "Implement the API logic"
+<span class="text-slate-600"># 2. Spawn workers in parallel (max 3)</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh spawn --label impl-structure --worktree</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh spawn --label impl-logic --worktree</span>
 
-<span class="text-slate-500"># 4. Wait for completion</span>
-./piharness.sh wait surface:5 --timeout 300
-./piharness.sh wait surface:6 --timeout 300
+<span class="text-slate-600"># 3. Send tasks</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh task surface:5 "Build the HTML structure"</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh task surface:6 "Implement the API logic"</span>
 
-<span class="text-slate-500"># 5. Collect and compare</span>
-./piharness.sh collect surface:5
-./piharness.sh collect surface:6
-./piharness.sh compare surface:5 surface:6
+<span class="text-slate-600"># 4. Wait for completion</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh wait surface:5 --timeout 300</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh wait surface:6 --timeout 300</span>
 
-<span class="text-slate-500"># 6. Apply best result and commit</span>
-<span class="text-slate-500"># (orchestrator reviews output, applies to repo)</span></pre>
+<span class="text-slate-600"># 5. Collect and compare</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh collect surface:5</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh collect surface:6</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh compare surface:5 surface:6</span>
+
+<span class="text-slate-600"># 6. Apply best result and commit</span>
+<span class="text-slate-600"># (orchestrator reviews output, applies to repo)</span></code></pre>
+      </div>
+
+      <!-- Role-based pipeline -->
+      <div class="section-card rounded-2xl p-8">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </div>
+          <h3 class="text-lg font-semibold text-white">Role-Based Pipeline</h3>
+        </div>
+        <p class="text-sm text-slate-400 mb-4 leading-relaxed">For complex features, spawn workers with specific roles and run a full implement → test → review cycle. The pipeline automates the round-trip across all three roles.</p>
+        <pre class="code-block p-5 text-sm leading-relaxed overflow-x-auto"><code><span class="text-slate-600"># Spawn role-specific workers with isolated worktrees</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh spawn --role implementer --worktree --label impl-1</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh spawn --role tester      --worktree --label test-1</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh spawn --role reviewer    --worktree --label review-1</span>
+
+<span class="text-slate-600"># Run automated pipeline</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh pipeline "Deploy Express API" --rounds 3</span>
+
+<span class="text-slate-600"># Or orchestrate manually</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh orchestrate surface:7 "Review and merge changes"</span></code></pre>
       </div>
     </section>
 
-    <!-- Commands -->
-    <section id="commands" class="section-link">
-      <h2 class="text-2xl font-bold text-white mb-6">Command Reference</h2>
-      <div class="space-y-4">
-        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-          <div class="bg-slate-800/50 px-6 py-3 border-b border-slate-700">
-            <h3 class="font-semibold text-white">Spawn / Register</h3>
+    <!-- Commands Reference -->
+    <section id="commands" class="anchor reveal">
+      <div class="section-header mb-8">
+        <h2 class="text-2xl font-bold text-white">Command Reference</h2>
+      </div>
+      <div class="grid md:grid-cols-2 gap-6">
+
+        <!-- Spawn / Register -->
+        <div class="section-card rounded-2xl overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-700/40 flex items-center gap-3">
+            <div class="w-6 h-6 rounded bg-sky-500/10 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            </div>
+            <h3 class="font-semibold text-white text-sm">Spawn / Register</h3>
           </div>
-          <div class="p-6 space-y-4">
-            <div><code class="text-sky-300">spawn [--cwd DIR] [--label L] [--worktree] [--branch B] [--role ROLE]</code><p class="text-sm text-slate-400 mt-1">Create a new Pi worker pane. First worker splits right, subsequent ones split down. Use <code class="text-sky-300">--worktree</code> for isolated git branches.</p></div>
-            <div><code class="text-sky-300">use &lt;surface&gt; [--label L]</code><p class="text-sm text-slate-400 mt-1">Register an existing cmux pane as a named worker.</p></div>
+          <div class="p-6 space-y-5">
+            <div>
+              <code class="text-sm text-sky-300 font-mono">spawn [--cwd DIR] [--label L] [--worktree] [--branch B] [--role ROLE]</code>
+              <p class="text-sm text-slate-400 mt-1.5 leading-relaxed">Create a new Pi worker pane. First worker splits right, subsequent ones split down. Use <code class="inline-code">--worktree</code> for isolated git branches.</p>
+            </div>
+            <div>
+              <code class="text-sm text-sky-300 font-mono">use &lt;surface&gt; [--label L]</code>
+              <p class="text-sm text-slate-400 mt-1.5 leading-relaxed">Register an existing cmux pane as a named worker.</p>
+            </div>
           </div>
         </div>
 
-        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-          <div class="bg-slate-800/50 px-6 py-3 border-b border-slate-700">
-            <h3 class="font-semibold text-white">Task Lifecycle</h3>
+        <!-- Task Lifecycle -->
+        <div class="section-card rounded-2xl overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-700/40 flex items-center gap-3">
+            <div class="w-6 h-6 rounded bg-emerald-500/10 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </div>
+            <h3 class="font-semibold text-white text-sm">Task Lifecycle</h3>
           </div>
-          <div class="p-6 space-y-4">
-            <div><code class="text-sky-300">task &lt;surface&gt; &lt;prompt&gt;</code><p class="text-sm text-slate-400 mt-1">Send a fire-and-forget task to a Pi worker.</p></div>
-            <div><code class="text-sky-300">auto &lt;surface&gt; &lt;prompt&gt;</code><p class="text-sm text-slate-400 mt-1">Task with automatic runtime failover on error. Recommended for production use.</p></div>
-            <div><code class="text-sky-300">wait &lt;surface&gt; [--timeout N]</code><p class="text-sm text-slate-400 mt-1">Block until the worker task completes (default 300s).</p></div>
-            <div><code class="text-sky-300">collect &lt;surface&gt;</code><p class="text-sm text-slate-400 mt-1">Get the complete output from a finished task.</p></div>
-            <div><code class="text-sky-300">peek &lt;surface&gt;</code><p class="text-sm text-slate-400 mt-1">Read partial output while the worker is still running.</p></div>
-          </div>
-        </div>
-
-        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-          <div class="bg-slate-800/50 px-6 py-3 border-b border-slate-700">
-            <h3 class="font-semibold text-white">Skill Management (Self-Evolving)</h3>
-          </div>
-          <div class="p-6 space-y-4">
-            <div><code class="text-sky-300">skill list</code><p class="text-sm text-slate-400 mt-1">List all installed skills with version, usage count, and description.</p></div>
-            <div><code class="text-sky-300">skill show &lt;name&gt;</code><p class="text-sm text-slate-400 mt-1">Show skill details + increments usage counter.</p></div>
-            <div><code class="text-sky-300">skill new &lt;name&gt; [--pattern P] [--desc D]</code><p class="text-sm text-slate-400 mt-1">Create a new skill scaffold with SKILL.md and template.md.</p></div>
-            <div><code class="text-sky-300">skill extract &lt;surface&gt; [--name N]</code><p class="text-sm text-slate-400 mt-1">Create a skill from a completed worker's output.</p></div>
-            <div><code class="text-sky-300">skill suggest</code><p class="text-sm text-slate-400 mt-1">Get skill suggestions from task history patterns.</p></div>
-            <div><code class="text-sky-300">learn track &lt;desc&gt; [--surface S] [--outcome O]</code><p class="text-sm text-slate-400 mt-1">Log a task for pattern detection.</p></div>
-            <div><code class="text-sky-300">learn history [--limit N]</code><p class="text-sm text-slate-400 mt-1">View recent task history.</p></div>
-            <div><code class="text-sky-300">learn suggest</code><p class="text-sm text-slate-400 mt-1">Analyze history for repeated patterns and suggest new skills.</p></div>
+          <div class="p-6 space-y-5">
+            <div><code class="text-sm text-sky-300 font-mono">task &lt;surface&gt; &lt;prompt&gt;</code><p class="text-sm text-slate-400 mt-1.5">Send a fire-and-forget task to a Pi worker.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">auto &lt;surface&gt; &lt;prompt&gt;</code><p class="text-sm text-slate-400 mt-1.5">Task with automatic runtime failover on error. Recommended for production use.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">wait &lt;surface&gt; [--timeout N]</code><p class="text-sm text-slate-400 mt-1.5">Block until the worker task completes (default 300s).</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">collect &lt;surface&gt;</code><p class="text-sm text-slate-400 mt-1.5">Get the complete output from a finished task.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">peek &lt;surface&gt;</code><p class="text-sm text-slate-400 mt-1.5">Read partial output while the worker is still running.</p></div>
           </div>
         </div>
 
-        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-          <div class="bg-slate-800/50 px-6 py-3 border-b border-slate-700">
-            <h3 class="font-semibold text-white">Observability & Comparison</h3>
+        <!-- Skill Management -->
+        <div class="section-card rounded-2xl overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-700/40 flex items-center gap-3">
+            <div class="w-6 h-6 rounded bg-purple-500/10 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <h3 class="font-semibold text-white text-sm">Skill Management <span class="badge bg-purple-500/10 text-purple-300 ml-2 text-[10px]">Self-Evolving</span></h3>
           </div>
-          <div class="p-6 space-y-4">
-            <div><code class="text-sky-300">status</code><p class="text-sm text-slate-400 mt-1">Dashboard: surface, label, status, elapsed, role, runtime, last line.</p></div>
-            <div><code class="text-sky-300">screen &lt;surface&gt;</code><p class="text-sm text-slate-400 mt-1">Live terminal capture of the worker pane.</p></div>
-            <div><code class="text-sky-300">list</code><p class="text-sm text-slate-400 mt-1">Full table of registered workers with metadata.</p></div>
-            <div><code class="text-sky-300">compare &lt;s1&gt; &lt;s2&gt;</code><p class="text-sm text-slate-400 mt-1">Side-by-side output comparison.</p></div>
-            <div><code class="text-sky-300">diff &lt;s1&gt; &lt;s2&gt;</code><p class="text-sm text-slate-400 mt-1">Git diff between worktree branches.</p></div>
+          <div class="p-6 space-y-5">
+            <div><code class="text-sm text-sky-300 font-mono">skill list</code><p class="text-sm text-slate-400 mt-1.5">List installed skills with version, usage count, and description.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">skill show &lt;name&gt;</code><p class="text-sm text-slate-400 mt-1.5">Show skill details. Increments usage counter.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">skill new &lt;name&gt; [--pattern P] [--desc D]</code><p class="text-sm text-slate-400 mt-1.5">Create a new skill scaffold with SKILL.md and template.md.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">skill extract &lt;surface&gt; [--name N]</code><p class="text-sm text-slate-400 mt-1.5">Create a skill from a completed worker's output.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">skill suggest</code><p class="text-sm text-slate-400 mt-1.5">Get skill suggestions from task history patterns.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">learn track &lt;desc&gt; [--surface S] [--outcome O]</code><p class="text-sm text-slate-400 mt-1.5">Log a task for pattern detection.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">learn history [--limit N]</code><p class="text-sm text-slate-400 mt-1.5">View recent task history.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">learn suggest</code><p class="text-sm text-slate-400 mt-1.5">Analyze history for repeated patterns and suggest new skills.</p></div>
           </div>
         </div>
 
-        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-          <div class="bg-slate-800/50 px-6 py-3 border-b border-slate-700">
-            <h3 class="font-semibold text-white">Cleanup</h3>
+        <!-- Observability -->
+        <div class="section-card rounded-2xl overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-700/40 flex items-center gap-3">
+            <div class="w-6 h-6 rounded bg-amber-500/10 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            </div>
+            <h3 class="font-semibold text-white text-sm">Observability &amp; Comparison</h3>
           </div>
-          <div class="p-6 space-y-4">
-            <div><code class="text-sky-300">close &lt;surface&gt; [--keep-worktree]</code><p class="text-sm text-slate-400 mt-1">Exit a worker pane and clean up.</p></div>
-            <div><code class="text-sky-300">clean</code><p class="text-sm text-slate-400 mt-1">Reset all state: outputs, logs, registry.</p></div>
+          <div class="p-6 space-y-5">
+            <div><code class="text-sm text-sky-300 font-mono">status</code><p class="text-sm text-slate-400 mt-1.5">Dashboard: surface, label, status, elapsed, role, runtime, last output line.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">screen &lt;surface&gt;</code><p class="text-sm text-slate-400 mt-1.5">Live terminal capture of the worker pane.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">list</code><p class="text-sm text-slate-400 mt-1.5">Full table of registered workers with metadata.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">compare &lt;s1&gt; &lt;s2&gt;</code><p class="text-sm text-slate-400 mt-1.5">Side-by-side output comparison.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">diff &lt;s1&gt; &lt;s2&gt;</code><p class="text-sm text-slate-400 mt-1.5">Git diff between worktree branches.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">close &lt;surface&gt; [--keep-worktree]</code><p class="text-sm text-slate-400 mt-1.5">Exit a worker pane and clean up. Use <code class="inline-code">--keep-worktree</code> to preserve the branch.</p></div>
+            <div><code class="text-sm text-sky-300 font-mono">clean</code><p class="text-sm text-slate-400 mt-1.5">Reset all state: outputs, logs, and worker registry.</p></div>
           </div>
         </div>
+
       </div>
     </section>
 
     <!-- Skills System -->
-    <section id="skills" class="section-link">
-      <h2 class="text-2xl font-bold text-white mb-6">Self-Evolving Skill System</h2>
-      <p class="text-slate-400 mb-6">PIHARNESS learns from repetitive work. Tasks that repeat 3+ times get extracted into reusable skills with trigger patterns, templates, and auto-suggestion.</p>
-
-      <div class="grid md:grid-cols-3 gap-4 mb-8">
-        <div class="skill-card bg-slate-900 rounded-xl p-5 border border-slate-800">
-          <div class="text-sky-400 font-semibold mb-2">prompt-escaping</div>
-          <p class="text-sm text-slate-400 mb-3">Avoid shell mangling of prompts with special characters ($, backticks).</p>
-          <span class="text-xs bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded">4 triggers</span>
-        </div>
-        <div class="skill-card bg-slate-900 rounded-xl p-5 border border-slate-800">
-          <div class="text-emerald-400 font-semibold mb-2">runtime-fallback</div>
-          <p class="text-sm text-slate-400 mb-3">Reliable Pi worker error handling with runtime chain failover.</p>
-          <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded">4 triggers</span>
-        </div>
-        <div class="skill-card bg-slate-900 rounded-xl p-5 border border-slate-800">
-          <div class="text-purple-400 font-semibold mb-2">pane-management</div>
-          <p class="text-sm text-slate-400 mb-3">Manage worker pane state and lifecycle across sessions.</p>
-          <span class="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">4 triggers</span>
-        </div>
+    <section id="skills" class="anchor reveal">
+      <div class="section-header mb-8">
+        <h2 class="text-2xl font-bold text-white">Self-Evolving Skill System</h2>
       </div>
 
-      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
-        <h3 class="font-semibold text-white mb-4">Skill Lifecycle</h3>
-        <pre class="text-sm text-slate-300 leading-relaxed">Task arrives → Check ~/.piharness/skills/ for matching patterns
-  → Match? → Reference skill in worker prompt
-  → No match? → Execute normally
-  → If task repeats 3+ times → Extract as skill
+      <div class="section-card rounded-2xl p-8 mb-6">
+        <p class="text-base leading-relaxed mb-6">PIHARNESS learns from repetitive work. Tasks that repeat 3+ times get extracted into reusable skills with trigger patterns, templates, and auto-suggestion. The system grows smarter with every task.</p>
 
-<span class="text-slate-500"># Extract a skill from worker output</span>
-./piharness.sh skill extract surface:5 --name my-pattern
+        <!-- Installed skills -->
+        <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Installed Skills</h3>
+        <div class="grid md:grid-cols-3 gap-4 mb-8">
+          <div class="skill-card rounded-xl p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-7 h-7 rounded-md bg-sky-500/10 flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+              </div>
+              <span class="text-white font-semibold text-sm">prompt-escaping</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed mb-3">Avoid shell mangling of prompts with special characters ($, backticks, quotes).</p>
+            <div class="flex items-center gap-3 text-xs text-slate-500">
+              <span class="badge bg-sky-500/10 text-sky-300">v1</span>
+              <span>Used 3 times</span>
+            </div>
+          </div>
+          <div class="skill-card rounded-xl p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-7 h-7 rounded-md bg-emerald-500/10 flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </div>
+              <span class="text-white font-semibold text-sm">runtime-fallback</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed mb-3">Reliable Pi worker error handling with runtime chain failover.</p>
+            <div class="flex items-center gap-3 text-xs text-slate-500">
+              <span class="badge bg-emerald-500/10 text-emerald-300">v1</span>
+              <span>Ready</span>
+            </div>
+          </div>
+          <div class="skill-card rounded-xl p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-7 h-7 rounded-md bg-purple-500/10 flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+              </div>
+              <span class="text-white font-semibold text-sm">pane-management</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed mb-3">Manage worker pane state and lifecycle across sessions.</p>
+            <div class="flex items-center gap-3 text-xs text-slate-500">
+              <span class="badge bg-purple-500/10 text-purple-300">v1</span>
+              <span>Ready</span>
+            </div>
+          </div>
+        </div>
 
-<span class="text-slate-500"># The system auto-suggests via keyword clustering</span>
-./piharness.sh learn suggest
-./piharness.sh skill suggest</pre>
+        <!-- Lifecycle -->
+        <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Skill Lifecycle</h3>
+        <div class="bg-slate-950/60 rounded-xl p-6 border border-slate-700/30">
+          <div class="flex flex-wrap items-center gap-2 text-sm mb-6">
+            <span class="badge bg-sky-500/10 text-sky-300">Task arrives</span>
+            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            <span class="badge bg-amber-500/10 text-amber-300">Check registry</span>
+            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            <span class="badge bg-emerald-500/10 text-emerald-300">Match?</span>
+            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            <span class="badge bg-purple-500/10 text-purple-300">Use skill</span>
+            <span class="text-slate-600 text-xs">or</span>
+            <span class="badge bg-rose-500/10 text-rose-300">Extract new</span>
+          </div>
+
+          <pre class="code-block p-5 text-sm leading-relaxed overflow-x-auto"><code><span class="text-slate-600"># Extract a skill from worker output</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh skill extract surface:5 --name my-pattern</span>
+
+<span class="text-slate-600"># The system auto-suggests via keyword clustering</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh learn suggest</span>
+<span class="text-emerald-400 font-medium">$</span> <span class="text-slate-200">./piharness.sh skill suggest</span></code></pre>
+        </div>
       </div>
     </section>
 
-    <!-- Pipeline -->
-    <section id="pipeline" class="section-link">
-      <h2 class="text-2xl font-bold text-white mb-6">Role-Based Pipeline</h2>
-      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
-        <p class="text-slate-400 mb-4">For complex features, spawn workers with specific roles and run a full implement→test→review cycle.</p>
-        <pre class="text-sm text-slate-300 leading-relaxed"><span class="text-slate-500"># Spawn role-specific workers</span>
-./piharness.sh spawn --role implementer --worktree --label impl-1
-./piharness.sh spawn --role tester      --worktree --label test-1
-./piharness.sh spawn --role reviewer    --worktree --label review-1
-
-<span class="text-slate-500"># Run automated pipeline</span>
-./piharness.sh pipeline "Deploy Express API" --rounds 3
-
-<span class="text-slate-500"># Or orchestrate manually</span>
-./piharness.sh orchestrate surface:7 "Review and merge changes"</pre>
+    <!-- Architecture -->
+    <section id="architecture" class="anchor reveal">
+      <div class="section-header mb-8">
+        <h2 class="text-2xl font-bold text-white">Architecture</h2>
       </div>
-    </section>
 
-    <!-- Runtime Chain -->
-    <section id="runtime" class="section-link">
-      <h2 class="text-2xl font-bold text-white mb-6">Runtime Chain</h2>
-      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
-        <p class="text-slate-400 mb-4">When a model hits rate limits or errors, the runtime chain automatically fails over to the next available runtime:</p>
-        <div class="flex items-center gap-2 text-sm flex-wrap mb-6">
-          <span class="bg-slate-800 text-sky-300 px-3 py-1 rounded">pi:kilo-auto/free</span>
-          <span class="text-slate-600">→</span>
-          <span class="bg-slate-800 text-sky-300 px-3 py-1 rounded">pi:stepfun/step-3.7-flash:free</span>
-          <span class="text-slate-600">→</span>
-          <span class="bg-slate-800 text-amber-300 px-3 py-1 rounded">opencode:claude-haiku-4-5</span>
-          <span class="text-slate-600">→</span>
-          <span class="bg-slate-800 text-emerald-300 px-3 py-1 rounded">ollama:qwen2.5-coder:7b</span>
-          <span class="text-slate-600">→</span>
-          <span class="bg-slate-800 text-purple-300 px-3 py-1 rounded">claude:default</span>
+      <div class="grid md:grid-cols-3 gap-6">
+
+        <!-- System diagram -->
+        <div class="md:col-span-2 section-card rounded-2xl p-8">
+          <p class="text-sm text-slate-400 mb-6 leading-relaxed">
+            The orchestrator reads CLAUDE.md, consults the skill registry, and routes tasks to Pi workers in cmux panes.
+            Skills are stored in <code class="inline-code">~/.piharness/skills/</code> and grow over time through pattern extraction.
+          </p>
+          <pre class="code-block p-6 text-sm leading-relaxed overflow-x-auto"><code><span class="text-slate-500">┌──────────────────────────────────────────────────────┐</span>
+<span class="text-sky-300">│               ORCHESTRATOR (Claude Code)              │</span>
+<span class="text-sky-300">│  Reads CLAUDE.md, consults skill registry,            │</span>
+<span class="text-sky-300">│  routes tasks to workers                              │</span>
+<span class="text-slate-500">└──────────────────────┬───────────────────────────────┘</span>
+<span class="text-slate-500">                       │</span>
+<span class="text-slate-500">                       ▼</span>
+<span class="text-slate-500">┌──────────────────────────────────────────────────────┐</span>
+<span class="text-emerald-300">│              SKILL-AWARE ROUTER                       │</span>
+<span class="text-emerald-300">│  task → match against skills → matched? → use skill  │</span>
+<span class="text-emerald-300">│  task → no match → new pattern → create in worktree  │</span>
+<span class="text-slate-500">└──────────────────────┬───────────────────────────────┘</span>
+<span class="text-slate-500">                       │</span>
+<span class="text-slate-500">          ┌────────────┼────────────┐</span>
+<span class="text-slate-500">          ▼            ▼            ▼</span>
+<span class="text-slate-500">   ┌──────────┐ ┌──────────┐ ┌──────────┐</span>
+<span class="text-amber-300">   │ Skill #1 │ │ Skill #2 │ │ Skill #N │</span><span class="text-slate-500">  ← learned over time</span>
+<span class="text-slate-500">   └──────────┘ └──────────┘ └──────────┘</span>
+<span class="text-slate-500">          │            │            │</span>
+<span class="text-slate-500">          └────────────┼────────────┘</span>
+<span class="text-slate-500">                       ▼</span>
+<span class="text-slate-500">┌──────────────────────────────────────────────────────┐</span>
+<span class="text-purple-300">│              GIT WORKTREE ENGINE                      │</span>
+<span class="text-purple-300">│  Isolated dev lanes for skill creation                │</span>
+<span class="text-slate-500">└──────────────────────────────────────────────────────┘</span></code></pre>
         </div>
-        <p class="text-sm text-slate-400">Override with <code class="text-sky-300">PIHARNESS_RUNTIMES</code> env var. Use <code class="text-sky-300">./piharness.sh runtimes</code> to inspect.</p>
-      </div>
-    </section>
 
-    <!-- Config -->
-    <section id="env" class="section-link">
-      <h2 class="text-2xl font-bold text-white mb-6">Configuration</h2>
-      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-slate-400 border-b border-slate-700">
-              <th class="text-left py-2 pr-4">Variable</th>
-              <th class="text-left py-2 pr-4">Default</th>
-              <th class="text-left py-2">Description</th>
-            </tr>
-          </thead>
-          <tbody class="text-slate-300">
-            <tr class="border-b border-slate-800"><td class="py-2 pr-4"><code>PIHARNESS_DIR</code></td><td class="py-2 pr-4"><code>~/.piharness</code></td><td class="py-2">State directory</td></tr>
-            <tr class="border-b border-slate-800"><td class="py-2 pr-4"><code>PIHARNESS_REPO</code></td><td class="py-2 pr-4"><code>script dir</code></td><td class="py-2">Git repo for worktrees</td></tr>
-            <tr class="border-b border-slate-800"><td class="py-2 pr-4"><code>PIHARNESS_RUNTIMES</code></td><td class="py-2 pr-4"><code>pi:...→claude</code></td><td class="py-2">Runtime failover chain</td></tr>
-            <tr class="border-b border-slate-800"><td class="py-2 pr-4"><code>PIHARNESS_MAX_WORKERS</code></td><td class="py-2 pr-4"><code>3</code></td><td class="py-2">Max concurrent workers</td></tr>
-            <tr><td class="py-2 pr-4"><code>PIHARNESS_ORCHESTRATOR</code></td><td class="py-2 pr-4"><code>chain[0]</code></td><td class="py-2">Runtime for orchestrator role</td></tr>
-          </tbody>
-        </table>
+        <!-- Runtime chain -->
+        <div class="section-card rounded-2xl p-8">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+              <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </div>
+            <h3 class="text-lg font-semibold text-white">Runtime Chain</h3>
+          </div>
+          <p class="text-sm text-slate-400 mb-4 leading-relaxed">When a model hits rate limits or errors, the runtime chain automatically fails over to the next available tier:</p>
+          <div class="space-y-2 mb-6">
+            <div class="bg-slate-800/30 rounded-lg px-4 py-2.5 flex items-center gap-3">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="text-sm text-sky-300 font-mono">pi:kilo-auto/free</span>
+            </div>
+            <div class="text-center text-slate-600 text-xs">▼ failover</div>
+            <div class="bg-slate-800/30 rounded-lg px-4 py-2.5 flex items-center gap-3">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="text-sm text-sky-300 font-mono">pi:stepfun/step-3.7-flash:free</span>
+            </div>
+            <div class="text-center text-slate-600 text-xs">▼ failover</div>
+            <div class="bg-slate-800/30 rounded-lg px-4 py-2.5 flex items-center gap-3">
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+              <span class="text-sm text-amber-300 font-mono">opencode:claude-haiku-4-5</span>
+            </div>
+            <div class="text-center text-slate-600 text-xs">▼ failover</div>
+            <div class="bg-slate-800/30 rounded-lg px-4 py-2.5 flex items-center gap-3">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="text-sm text-emerald-300 font-mono">ollama:qwen2.5-coder:7b</span>
+            </div>
+            <div class="text-center text-slate-600 text-xs">▼ failover</div>
+            <div class="bg-slate-800/30 rounded-lg px-4 py-2.5 flex items-center gap-3">
+              <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+              <span class="text-sm text-purple-300 font-mono">claude:default</span>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500">Override with <code class="inline-code">PIHARNESS_RUNTIMES</code> env var. Use <code class="inline-code">./piharness.sh runtimes</code> to inspect.</p>
+        </div>
+
       </div>
     </section>
 
     <!-- MCP Tools -->
-    <section id="mcp" class="section-link">
-      <h2 class="text-2xl font-bold text-white mb-6">MCP Server Tools</h2>
-      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
-        <p class="text-slate-400 mb-4">PIHARNESS exposes its full command set as MCP tools for orchestrator agents:</p>
-        <div class="grid md:grid-cols-2 gap-3 text-sm">
-          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">spawn_worker</code><p class="text-slate-500 text-xs mt-1">Create Pi worker pane</p></div>
-          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">run_task</code><p class="text-slate-500 text-xs mt-1">Send task to worker</p></div>
-          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">wait_worker</code><p class="text-slate-500 text-xs mt-1">Block until done</p></div>
-          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">get_output</code><p class="text-slate-500 text-xs mt-1">Get final output</p></div>
-          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">get_status</code><p class="text-slate-500 text-xs mt-1">Worker dashboard</p></div>
-          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">compare_outputs</code><p class="text-slate-500 text-xs mt-1">Side-by-side review</p></div>
-          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">git_diff</code><p class="text-slate-500 text-xs mt-1">Worktree branch diff</p></div>
-          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">skill_list</code><p class="text-slate-500 text-xs mt-1">List installed skills</p></div>
-          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">skill_extract</code><p class="text-slate-500 text-xs mt-1">Extract skill from output</p></div>
-          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">learn_track</code><p class="text-slate-500 text-xs mt-1">Log task for learning</p></div>
-          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">learn_suggest</code><p class="text-slate-500 text-xs mt-1">Get pattern suggestions</p></div>
-          <div class="bg-slate-800/50 rounded p-3"><code class="text-sky-300">close_worker</code><p class="text-slate-500 text-xs mt-1">Clean up worker pane</p></div>
+    <section id="mcp" class="anchor reveal">
+      <div class="section-header mb-8">
+        <h2 class="text-2xl font-bold text-white">MCP Server</h2>
+      </div>
+      <div class="section-card rounded-2xl p-8">
+        <p class="text-sm text-slate-400 mb-6 leading-relaxed">
+          PIHARNESS exposes its full command set as MCP (Model Context Protocol) tools for orchestrator agents.
+          These tools delegate to <code class="inline-code">bash piharness.sh</code> commands — no duplicate logic.
+          Registered in <code class="inline-code">.mcp.json</code> at the project root.
+        </p>
+        <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">spawn_worker</code>
+            <p class="text-xs text-slate-500 mt-1">Create Pi worker pane</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">run_task</code>
+            <p class="text-xs text-slate-500 mt-1">Send task to worker</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">wait_worker</code>
+            <p class="text-xs text-slate-500 mt-1">Block until done</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">get_output</code>
+            <p class="text-xs text-slate-500 mt-1">Get final output</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">peek_output</code>
+            <p class="text-xs text-slate-500 mt-1">Read partial output</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">get_screen</code>
+            <p class="text-xs text-slate-500 mt-1">Live pane capture</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">get_status</code>
+            <p class="text-xs text-slate-500 mt-1">Worker dashboard</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">compare_outputs</code>
+            <p class="text-xs text-slate-500 mt-1">Side-by-side review</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">git_diff</code>
+            <p class="text-xs text-slate-500 mt-1">Worktree branch diff</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">skill_list</code>
+            <p class="text-xs text-slate-500 mt-1">List installed skills</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">skill_extract</code>
+            <p class="text-xs text-slate-500 mt-1">Extract skill from output</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">learn_track</code>
+            <p class="text-xs text-slate-500 mt-1">Log task for learning</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">learn_suggest</code>
+            <p class="text-xs text-slate-500 mt-1">Get pattern suggestions</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">close_worker</code>
+            <p class="text-xs text-slate-500 mt-1">Clean up worker pane</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">get_log</code>
+            <p class="text-xs text-slate-500 mt-1">Worker event log</p>
+          </div>
+          <div class="bg-slate-800/20 rounded-lg p-3.5 border border-slate-700/30 hover:border-sky-500/20 transition-colors">
+            <code class="text-sm text-sky-300 font-mono">list_workers</code>
+            <p class="text-xs text-slate-500 mt-1">All registered workers</p>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Footer -->
-    <footer class="text-center text-sm text-slate-600 py-8 border-t border-slate-800">
-      PIHARNESS &mdash; built for Claude Code orchestration &middot; MIT
-    </footer>
+    <!-- Configuration -->
+    <section id="config" class="anchor reveal">
+      <div class="section-header mb-8">
+        <h2 class="text-2xl font-bold text-white">Configuration</h2>
+      </div>
+      <div class="section-card rounded-2xl p-8">
+        <p class="text-sm text-slate-400 mb-6 leading-relaxed">
+          PIHARNESS is configured through environment variables. All paths default to <code class="inline-code">~/.piharness/</code> unless overridden.
+        </p>
+        <div class="overflow-x-auto">
+          <table class="param-table w-full text-sm">
+            <thead>
+              <tr class="text-slate-500 text-xs uppercase tracking-wider">
+                <th class="text-left font-semibold">Variable</th>
+                <th class="text-left font-semibold">Default</th>
+                <th class="text-left font-semibold">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code class="inline-code">PIHARNESS_DIR</code></td><td><code class="inline-code text-slate-400">~/.piharness</code></td><td class="text-slate-400">State directory for registry, outputs, logs</td></tr>
+              <tr><td><code class="inline-code">PIHARNESS_REPO</code></td><td><code class="inline-code text-slate-400">script dir</code></td><td class="text-slate-400">Git repo path for worktree operations</td></tr>
+              <tr><td><code class="inline-code">PIHARNESS_RUNTIMES</code></td><td><code class="inline-code text-slate-400">pi:...→claude</code></td><td class="text-slate-400">Runtime failover chain (colon-separated)</td></tr>
+              <tr><td><code class="inline-code">PIHARNESS_MAX_WORKERS</code></td><td><code class="inline-code text-slate-400">3</code></td><td class="text-slate-400">Maximum concurrent worker panes</td></tr>
+              <tr><td><code class="inline-code">PIHARNESS_ORCHESTRATOR</code></td><td><code class="inline-code text-slate-400">chain[0]</code></td><td class="text-slate-400">Runtime to use for orchestrator role</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800/60 mt-24">
+    <div class="max-w-6xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-600">
+      <div class="flex items-center gap-4">
+        <span class="text-white font-semibold text-sm">PIHARNESS</span>
+        <span>v1.0</span>
+        <span class="hidden sm:inline">·</span>
+        <span class="hidden sm:inline">Built for Claude Code orchestration</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <span>MIT License</span>
+        <span>·</span>
+        <span>Pi Worker Orchestrator</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Copy-to-clipboard toast -->
+  <div id="copy-toast" class="copied-toast">Copied to clipboard</div>
+
+  <script>
+    // Copy-to-clipboard for all code blocks
+    document.querySelectorAll('.code-block code').forEach(codeEl => {
+      const btn = document.createElement('button');
+      btn.className = 'copy-btn px-2 py-1 text-xs rounded bg-slate-700/50 text-slate-400 hover:bg-slate-600/50 hover:text-white transition-colors';
+      btn.textContent = 'Copy';
+      btn.onclick = () => {
+        const text = codeEl.textContent;
+        navigator.clipboard.writeText(text);
+        const toast = document.getElementById('copy-toast');
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 1500);
+      };
+      codeEl.closest('.code-block').appendChild(btn);
+    });
+
+    // Scroll reveal animation
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // Close mobile menu on link click
+    document.querySelectorAll('#mobile-menu a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('mobile-menu').classList.add('hidden');
+      });
+    });
+  </script>
 </body>
 </html>
