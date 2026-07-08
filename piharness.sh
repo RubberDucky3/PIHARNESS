@@ -1977,6 +1977,84 @@ else:
     ;;
 
   # ---------------------------------------------------------------------------
+  # ADE (AI DEVELOPMENT ENVIRONMENT) COMMANDS
+  ade)
+  # Usage: piharness ade <init|status|context>
+  # ADE (AI Development Environment) management commands.
+  # ---------------------------------------------------------------------------
+    ade_cmd="${1:-help}"; shift || true
+    case "$ade_cmd" in
+      init)
+        # Start ade-mcp server, create default workspace
+        echo "=== ADE Init ==="
+        # Check ade-mcp is running
+        if nc -z 127.0.0.1 9000 2>/dev/null; then
+          echo "  ✓ ade-mcp already running on port 9000"
+        else
+          echo "  Starting ade-mcp..."
+          nohup "$SCRIPT_DIR/ade/ade-mcp/.venv/bin/python3" \
+            "$SCRIPT_DIR/ade/ade-mcp/server.py" \
+            > /tmp/ade-mcp.log 2>&1 &
+          sleep 2
+          if nc -z 127.0.0.1 9000 2>/dev/null; then
+            echo "  ✓ ade-mcp started"
+          else
+            echo "  ✗ ade-mcp failed to start (check /tmp/ade-mcp.log)"
+            exit 1
+          fi
+        fi
+        ws_name="ade-$(date +%s)"
+        bash "$SCRIPT_DIR/ade/ade-workspace.sh" --name "$ws_name"
+        echo "=== ADE Init Complete ==="
+        ;;
+      status)
+        echo "=== ADE Status ==="
+        # ade-mcp check
+        if nc -z 127.0.0.1 9000 2>/dev/null; then
+          echo "  ade-mcp:   ✓ running (127.0.0.1:9000)"
+        else
+          echo "  ade-mcp:   ✗ not running (start with: piharness ade init)"
+        fi
+        # cmux check
+        if command -v cmux &>/dev/null; then
+          echo "  cmux:      ✓ $(cmux version 2>/dev/null | head -1)"
+        else
+          echo "  cmux:      ✗ not installed"
+        fi
+        # Workspaces
+        echo "  Workspaces:"
+        cmux list-workspaces 2>/dev/null | head -5 || echo "    (none)"
+        echo "=== ADE Status Complete ==="
+        ;;
+      context)
+        # Quick context view from ade-mcp via Python MCP client
+        if ! nc -z 127.0.0.1 9000 2>/dev/null; then
+          echo "ade-mcp not running. Start with: piharness ade init" >&2
+          exit 1
+        fi
+        topic="${1:-}"
+        venv_python="$SCRIPT_DIR/ade/ade-mcp/.venv/bin/python3"
+        if [[ -n "$topic" ]]; then
+          "$venv_python" "$SCRIPT_DIR/ade/ade-context.py" memory "$topic" 2>/dev/null || \
+            echo "Error querying ade-mcp (try: piharness ade init)"
+        else
+          "$venv_python" "$SCRIPT_DIR/ade/ade-context.py" memory 2>/dev/null || \
+            echo "Error querying ade-mcp (try: piharness ade init)"
+        fi
+        ;;
+      help|*)
+        echo "Usage: piharness ade <init|status|context> [search-term]"
+        echo ""
+        echo "Commands:"
+        echo "  init              Start ade-mcp and create workspace"
+        echo "  status            Check ADE component health"
+        echo "  context [search]  List resources or search memory"
+        exit 0
+        ;;
+    esac
+    ;;
+
+  # ---------------------------------------------------------------------------
   help|*)
   # ---------------------------------------------------------------------------
     cat <<'EOF'
@@ -2036,6 +2114,12 @@ Usage: ./piharness.sh <command> [args]
   learn       track|history|suggest            pattern detection
   self-evolve [--dry-run]                     auto-extract skills from task patterns
   nightly                                      full overnight maintenance
+
+── ADE (AI DEVELOPMENT ENVIRONMENT) ──────────────────────────────────────────
+  ade     init|status|context   ADE management commands
+  ade init                      start ade-mcp server + create workspace
+  ade status                    check ADE component health
+  ade context [search]          browse shared context / search memory
 
 ── CLEANUP ────────────────────────────────────────────────────────────────
   clean   reset all state (keeps panes open)
