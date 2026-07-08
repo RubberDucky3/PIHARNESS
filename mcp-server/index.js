@@ -18,6 +18,11 @@
  *   git_diff            Git diff between two workers' worktree branches
  *   close_worker        Exit pane and clean up worktree
  *   clean_all           Reset all piharness state
+ *   skill_list          List installed skills
+ *   skill_show          Show skill details
+ *   skill_extract       Create skill from worker output
+ *   learn_track         Log a task for pattern detection
+ *   learn_suggest       Suggest new skills from repeated patterns
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -266,6 +271,61 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {},
       },
     },
+    {
+      name: "skill_list",
+      description: "List installed skills with version, usage count, and creation date.",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
+    {
+      name: "skill_show",
+      description: "Show a skill's full SKILL.md content including trigger patterns and usage guidance.",
+      inputSchema: {
+        type: "object",
+        required: ["name"],
+        properties: {
+          name: { type: "string", description: "Skill name (e.g. 'prompt-escaping')" },
+        },
+      },
+    },
+    {
+      name: "skill_extract",
+      description: "Create a reusable skill scaffold from a finished worker's output. Auto-generates a name from the output content if --name is omitted.",
+      inputSchema: {
+        type: "object",
+        required: ["surface"],
+        properties: {
+          surface: { type: "string", description: "Worker surface ID to extract from" },
+          name: { type: "string", description: "Optional skill name (auto-generated from output if omitted)" },
+          trigger: { type: "string", description: "Trigger pattern for matching future tasks" },
+          desc: { type: "string", description: "Description of what the skill does" },
+        },
+      },
+    },
+    {
+      name: "learn_track",
+      description: "Log a task description with outcome for pattern detection. Used after any significant worker task to build the task history for future skill suggestions.",
+      inputSchema: {
+        type: "object",
+        required: ["description"],
+        properties: {
+          description: { type: "string", description: "What the task accomplished" },
+          surface: { type: "string", description: "Worker surface ID" },
+          outcome: { type: "string", description: "Task outcome: success, failed" },
+          skill: { type: "string", description: "Skill name if a skill was used" },
+        },
+      },
+    },
+    {
+      name: "learn_suggest",
+      description: "Analyze task history for repeated patterns and suggest new skills to create. Uses keyword clustering — tasks sharing 2+ keywords form a cluster. Run periodically after completing several tasks.",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
   ],
 }));
 
@@ -328,6 +388,36 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
     case "clean_all":
       text = ph(["clean"]);
+      break;
+
+    case "skill_list":
+      text = ph(["skill", "list"]);
+      break;
+
+    case "skill_show":
+      text = ph(["skill", "show", args.name]);
+      break;
+
+    case "skill_extract": {
+      const a = ["skill", "extract", args.surface];
+      if (args.name)    a.push("--name",    args.name);
+      if (args.trigger) a.push("--trigger", args.trigger);
+      if (args.desc)    a.push("--desc",    args.desc);
+      text = ph(a);
+      break;
+    }
+
+    case "learn_track": {
+      const a = ["learn", "track", args.description];
+      if (args.surface) a.push("--surface", args.surface);
+      if (args.outcome) a.push("--outcome", args.outcome);
+      if (args.skill)   a.push("--skill",   args.skill);
+      text = ph(a);
+      break;
+    }
+
+    case "learn_suggest":
+      text = ph(["learn", "suggest"]);
       break;
 
     default:
