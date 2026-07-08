@@ -11,7 +11,10 @@ OUTPUTS_DIR="$PIHARNESS_DIR/outputs"
 LOGS_DIR="$PIHARNESS_DIR/logs"
 WORKTREES_DIR="$PIHARNESS_DIR/worktrees"
 REGISTRY="$PIHARNESS_DIR/workers.tsv"
+LAST_SURFACE_FILE="$PIHARNESS_DIR/last_surface"
 # Registry cols: surface_id TAB label TAB cwd TAB worktree_path TAB branch TAB start_epoch
+
+MAX_WORKERS="${PIHARNESS_MAX_WORKERS:-3}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${PIHARNESS_REPO:-$SCRIPT_DIR}"
@@ -75,11 +78,34 @@ case "$cmd" in
       esac
     done
 
-    raw=$(cmux new-split right --focus false 2>&1)
+    # Enforce max worker limit
+    worker_count=$(wc -l < "$REGISTRY" | tr -d ' ')
+    if [[ "$worker_count" -ge "$MAX_WORKERS" ]]; then
+      echo "ERROR: max $MAX_WORKERS workers already running. Use 'close <surface>' first." >&2
+      exit 1
+    fi
+
+    # Split direction: right for first worker, down from last worker for subsequent
+    if [[ "$worker_count" -eq 0 ]]; then
+      split_dir="right"
+      split_from=""
+    else
+      split_dir="down"
+      split_from=$(cat "$LAST_SURFACE_FILE" 2>/dev/null || echo "")
+    fi
+
+    if [[ -n "$split_from" ]]; then
+      raw=$(cmux new-split "$split_dir" --surface "$split_from" --focus false 2>&1)
+    else
+      raw=$(cmux new-split "$split_dir" --focus false 2>&1)
+    fi
+
     surface=$(printf '%s' "$raw" | grep -oE 'surface:[0-9]+' | head -1)
     if [[ -z "$surface" ]]; then
       echo "ERROR: could not parse surface from: $raw" >&2; exit 1
     fi
+
+    echo "$surface" > "$LAST_SURFACE_FILE"
 
     worktree_path=""
     if [[ "$use_worktree" == true ]]; then
@@ -330,6 +356,10 @@ rm -f $(printf '%q' "$tmpfile")"$'\n' >/dev/null
     grep -v "^${surface}	" "$REGISTRY" > "$tmp" 2>/dev/null || true
     mv "$tmp" "$REGISTRY"
 
+    # If this was the last spawned surface, clear the tracker
+    last=$(cat "$LAST_SURFACE_FILE" 2>/dev/null || echo "")
+    [[ "$last" == "$surface" ]] && rm -f "$LAST_SURFACE_FILE"
+
     _log "$surface" "CLOSED" ""
     rm -f "$(_outfile "$surface")"
     echo "Closed $surface"
@@ -339,7 +369,7 @@ rm -f $(printf '%q' "$tmpfile")"$'\n' >/dev/null
   clean)
   # Usage: piharness clean
   # ---------------------------------------------------------------------------
-    rm -f "$OUTPUTS_DIR"/*.txt "$LOGS_DIR"/*.log
+    rm -f "$OUTPUTS_DIR"/*.txt "$LOGS_DIR"/*.log "$LAST_SURFACE_FILE"
     > "$REGISTRY"
     echo "Cleaned."
     ;;

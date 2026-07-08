@@ -82,6 +82,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       name: "spawn_worker",
       description:
         "Spawn a new Pi worker pane in cmux. Returns the surface ID (e.g. 'surface:11'). " +
+        "Max 3 workers at a time (set by PIHARNESS_MAX_WORKERS). " +
+        "First worker splits right from orchestrator; subsequent workers split down (horizontal). " +
         "Use worktree=true to give the worker its own isolated git branch so code changes don't conflict.",
       inputSchema: {
         type: "object",
