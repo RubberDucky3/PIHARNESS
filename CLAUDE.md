@@ -42,6 +42,16 @@ If you find yourself doing the same thing 3+ times without a matching skill:
 
 The system auto-suggests new skills via keyword clustering when you call `learn suggest`.
 
+### Skill authoring references
+
+When creating or editing skills, reference the [[skill-authoring]] skill for format standards (description routing, body structure, trigger_patterns), anti-patterns to avoid, and testing workflow. New skills should match the pattern at `~/.piharness/skills/skill-authoring/SKILL.md`.
+
+Other available skills and their trigger domains:
+- [[cmux-commands]] — cmux CLI ref syntax, surface health, notifications, tab labeling
+- [[handoff-session]] — session continuity and context handoff across agent resets
+- [[runtime-models]] — Pi model registration, silent fallback diagnosis, runtime chain config
+- [[codex-integration]] — Codex CLI in PIHARNESS runtime chain
+
 ## Core Rule: Offload all implementation to workers
 
 **Always use Pi workers for:**

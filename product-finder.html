@@ -3,97 +3,313 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Product Finder</title>
+    <title>Product Finder — AI Shopping Agent</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>.star-filled { color: #fbbf24; } .star-empty { color: #4b5563; }</style>
-    <script>
-        window.MockDataModule = {
-          generateProducts: function(query) {
-            var c = query.charCodeAt(0) || 65;
-            var base = 100 + (c % 800);
-            function s(i) { return (c * 7 + i * 13) % 100; }
-            var amazonBase = base;
-            var bestbuyBase = Math.round(base * 1.08);
-            var neweggBase = Math.round(base * 0.95);
-            return [
-              { id: 'amz-1', name: query + ' Pro 16GB OC Edition', price: amazonBase, rating: 3.8 + (s(1) % 11) / 10, reviews: 100 + s(2) * 120, source: 'Amazon', url: 'https://www.amazon.com/dp/B0' + (10000000 + s(3) * 10000000), inStock: s(4) > 30 },
-              { id: 'amz-2', name: query + ' Ultra 32GB SSD', price: amazonBase + 50 + (s(5) % 50), rating: 3.8 + (s(6) % 11) / 10, reviews: 100 + s(7) * 120, source: 'Amazon', url: 'https://www.amazon.com/dp/B0' + (10000000 + s(8) * 10000000), inStock: s(9) > 30 },
-              { id: 'amz-3', name: query + ' Gaming RTX 8GB', price: amazonBase - 20 + (s(10) % 40), rating: 3.8 + (s(11) % 11) / 10, reviews: 100 + s(12) * 120, source: 'Amazon', url: 'https://www.amazon.com/dp/B0' + (10000000 + s(13) * 10000000), inStock: s(14) > 30 },
-              { id: 'bb-1', name: query + ' Pro 16GB OC Edition', price: bestbuyBase, rating: 3.8 + (s(15) % 11) / 10, reviews: 100 + s(16) * 120, source: 'Best Buy', url: 'https://www.bestbuy.com/site/' + query.replace(/\s+/g, '-').toLowerCase() + '/' + (10000000 + s(17) * 10000000) + '.p', inStock: s(18) > 30 },
-              { id: 'bb-2', name: query + ' Ultra 32GB SSD', price: bestbuyBase + 50 + (s(19) % 50), rating: 3.8 + (s(20) % 11) / 10, reviews: 100 + s(21) * 120, source: 'Best Buy', url: 'https://www.bestbuy.com/site/' + query.replace(/\s+/g, '-').toLowerCase() + '/' + (10000000 + s(22) * 10000000) + '.p', inStock: s(23) > 30 },
-              { id: 'bb-3', name: query + ' Gaming RTX 8GB', price: bestbuyBase - 20 + (s(24) % 40), rating: 3.8 + (s(25) % 11) / 10, reviews: 100 + s(26) * 120, source: 'Best Buy', url: 'https://www.bestbuy.com/site/' + query.replace(/\s+/g, '-').toLowerCase() + '/' + (10000000 + s(27) * 10000000) + '.p', inStock: s(28) > 30 },
-              { id: 'ng-1', name: query + ' Pro 16GB OC Edition', price: neweggBase, rating: 3.8 + (s(29) % 11) / 10, reviews: 100 + s(30) * 120, source: 'Newegg', url: 'https://www.newegg.com/p/' + (100000000 + s(31) * 100000000), inStock: s(37) > 30 },
-              { id: 'ng-2', name: query + ' Ultra 32GB SSD', price: neweggBase + 50 + (s(33) % 50), rating: 3.8 + (s(34) % 11) / 10, reviews: 100 + s(35) * 120, source: 'Newegg', url: 'https://www.newegg.com/p/' + (100000000 + s(36) * 100000000), inStock: s(37) > 30 },
-              { id: 'ng-3', name: query + ' Gaming RTX 8GB', price: neweggBase - 20 + (s(38) % 40), rating: 3.8 + (s(39) % 11) / 10, reviews: 100 + s(40) * 120, source: 'Newegg', url: 'https://www.newegg.com/p/' + (100000000 + s(41) * 100000000), inStock: s(42) > 30 }
-            ];
-          }
-        };
-    </script>
-    <script>
-        window.RankingEngine = {
-          rankProducts(products) {
-            if (!Array.isArray(products) || products.length === 0) return [];
-            const data = products.map(p => ({ ...p, _price: Number(p.price) || 0, _rating: Number(p.rating) || 0, _reviews: Number(p.reviews) || 0 }));
-            const prices = data.map(d => d._price);
-            const valueRaws = data.map(d => (d._rating / (d._price || 1)) * 1000);
-            const reviewRaws = data.map(d => Math.log(d._reviews || 1));
-            const minPrice = Math.min(...prices), maxPrice = Math.max(...prices);
-            const minValue = Math.min(...valueRaws), maxValue = Math.max(...valueRaws);
-            const minReview = Math.min(...reviewRaws), maxReview = Math.max(...reviewRaws);
-            const round1 = n => Math.round(n * 10) / 10;
-            const computed = data.map((d, i) => {
-              const priceScore = maxPrice === minPrice ? 100 : ((maxPrice - d._price) / (maxPrice - minPrice)) * 100;
-              const ratingScore = (d._rating / 5) * 100;
-              const valueScore = maxValue === minValue ? 100 : ((valueRaws[i] - minValue) / (maxValue - minValue)) * 100;
-              const reviewScore = maxReview === minReview ? 100 : ((reviewRaws[i] - minReview) / (maxReview - minReview)) * 100;
-              const combinedScore = (priceScore + ratingScore + valueScore + reviewScore) / 4;
-              return { product: d, priceScore: round1(priceScore), ratingScore: round1(ratingScore), valueScore: round1(valueScore), reviewScore: round1(reviewScore), combinedScore: round1(combinedScore) };
-            });
-            const maxPriceScore = Math.max(...computed.map(c => c.priceScore));
-            const maxRatingScore = Math.max(...computed.map(c => c.ratingScore));
-            const maxValueScore = Math.max(...computed.map(c => c.valueScore));
-            const maxReviewScore = Math.max(...computed.map(c => c.reviewScore));
-            const maxCombined = Math.max(...computed.map(c => c.combinedScore));
-            const result = computed.map(c => {
-              const badges = [];
-              if (c.priceScore === maxPriceScore) badges.push("BEST PRICE");
-              if (c.ratingScore === maxRatingScore) badges.push("TOP RATED");
-              if (c.valueScore === maxValueScore) badges.push("BEST VALUE");
-              if (c.reviewScore === maxReviewScore) badges.push("MOST REVIEWS");
-              if (c.combinedScore === maxCombined) badges.push("BEST PICK");
-              const { _price, _rating, _reviews, ...rest } = c.product;
-              return { ...rest, combinedScore: c.combinedScore, badges };
-            });
-            result.sort((a, b) => b.combinedScore - a.combinedScore);
-            return result;
-          }
-        };
-    </script>
+    <style>
+        * { box-sizing: border-box; }
+
+        /* Stars */
+        .star-filled { color: #fbbf24; }
+        .star-empty { color: #4b5563; }
+
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+        .pulse-dot { animation: pulse 1.5s ease-in-out infinite; }
+        .slide-down { animation: slideDown 0.3s ease-out forwards; }
+
+        .spinner { width: 40px; height: 40px; border: 4px solid #374151; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+
+        .shimmer-bg {
+            background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s ease-in-out infinite;
+        }
+
+        /* Store accent colors */
+        .store-amazon { --store-color: #f97316; }
+        .store-bestbuy { --store-color: #3b82f6; }
+        .store-newegg { --store-color: #ef4444; }
+
+        /* Gradient text */
+        .text-gradient { background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        /* Suggestion chip hover */
+        .chip { transition: all 0.2s ease; cursor: pointer; }
+        .chip:hover { transform: translateY(-1px); }
+
+        /* Card hover */
+        .product-card { transition: all 0.25s ease; }
+        .product-card:hover { transform: translateY(-3px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.4); }
+
+        /* Scrollbar dark */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
+        /* Best pick card */
+        .best-pick-glow { box-shadow: 0 0 20px rgba(251, 191, 36, 0.15); }
+
+        /* Progress bar fill animation */
+        @keyframes fillBar { from { width: 0; } to { width: var(--score-width); } }
+        .score-bar { animation: fillBar 0.8s ease-out forwards; }
+    </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen">
-    <div class="max-w-7xl mx-auto px-4 py-8">
-        <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold mb-2">Product Finder</h1>
-            <p class="text-gray-400 mb-6">Powered by 3 Pi agents</p>
-            <div class="flex justify-center gap-2 max-w-2xl mx-auto">
-                <input type="text" id="searchInput" placeholder="Search electronics... (e.g. RTX 4090, MacBook Pro)" class="flex-1 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
-                <button id="searchBtn" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors">Search</button>
+<body class="bg-gray-950 text-white min-h-screen font-sans antialiased">
+
+    <!-- ====== HERO ====== -->
+    <header class="relative overflow-hidden">
+        <!-- Background gradient -->
+        <div class="absolute inset-0 bg-gradient-to-b from-blue-900/30 via-gray-950 to-gray-950 pointer-events-none"></div>
+        <div class="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute top-0 right-1/4 w-80 h-80 bg-purple-500/8 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="relative max-w-5xl mx-auto px-4 pt-14 pb-10 text-center">
+            <!-- Badge -->
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-gray-800/70 border border-gray-700 rounded-full text-xs text-gray-400 mb-6">
+                <span class="w-2 h-2 rounded-full bg-green-400 pulse-dot"></span>
+                AI Shopping Agent — 3 Store Scrapers Active
             </div>
-        </header>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700"><div class="flex items-center justify-between"><div><p class="text-sm text-gray-400">Agent 1</p><p class="font-semibold">Mock Data</p></div><span class="px-3 py-1 bg-green-600 text-white text-xs font-bold rounded-full">done</span></div></div>
-            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700"><div class="flex items-center justify-between"><div><p class="text-sm text-gray-400">Agent 2</p><p class="font-semibold">Ranking Engine</p></div><span class="px-3 py-1 bg-green-600 text-white text-xs font-bold rounded-full">done</span></div></div>
-            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700"><div class="flex items-center justify-between"><div><p class="text-sm text-gray-400">Agent 3</p><p class="font-semibold">Frontend UI</p></div><span class="px-3 py-1 bg-green-600 text-white text-xs font-bold rounded-full">done</span></div></div>
+
+            <h1 class="text-5xl md:text-6xl font-extrabold mb-4 tracking-tight">
+                <span class="text-gradient">Product Finder</span>
+            </h1>
+            <p class="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-8">
+                Real-time electronics search across <span class="text-orange-400 font-medium">Amazon</span>,
+                <span class="text-blue-400 font-medium">Best Buy</span> &amp;
+                <span class="text-red-400 font-medium">Newegg</span>
+            </p>
+
+            <!-- Search Bar -->
+            <div class="max-w-2xl mx-auto relative">
+                <div class="flex items-center bg-gray-800/80 border border-gray-700 focus-within:border-blue-500 rounded-xl overflow-hidden transition-colors shadow-lg shadow-black/20">
+                    <svg class="w-5 h-5 text-gray-500 ml-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" id="searchInput" placeholder="Search electronics... (e.g. RTX 4090, MacBook Pro)" class="flex-1 bg-transparent px-4 py-4 text-white placeholder-gray-500 focus:outline-none text-base">
+                    <button id="searchBtn" class="flex items-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-500 font-semibold transition-all text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        Search
+                    </button>
+                </div>
+            </div>
+
+            <!-- Suggestion Chips -->
+            <div class="flex flex-wrap justify-center gap-2 mt-4 max-w-2xl mx-auto">
+                <span class="text-xs text-gray-500 self-center mr-1">Try:</span>
+                <span class="chip px-3 py-1.5 bg-gray-800/60 border border-gray-700 rounded-full text-xs text-gray-300 hover:border-gray-500" data-suggestion="RTX 5090">RTX 5090</span>
+                <span class="chip px-3 py-1.5 bg-gray-800/60 border border-gray-700 rounded-full text-xs text-gray-300 hover:border-gray-500" data-suggestion="MacBook Pro">MacBook Pro</span>
+                <span class="chip px-3 py-1.5 bg-gray-800/60 border border-gray-700 rounded-full text-xs text-gray-300 hover:border-gray-500" data-suggestion="gaming keyboard">gaming keyboard</span>
+                <span class="chip px-3 py-1.5 bg-gray-800/60 border border-gray-700 rounded-full text-xs text-gray-300 hover:border-gray-500" data-suggestion="AirPods">AirPods</span>
+                <span class="chip px-3 py-1.5 bg-gray-800/60 border border-gray-700 rounded-full text-xs text-gray-300 hover:border-gray-500" data-suggestion="4K monitor">4K monitor</span>
+            </div>
         </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 pb-16">
+
+        <!-- ====== STORE STATUS CARDS ====== -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 fade-in-up" style="animation-delay:0.1s">
+            <!-- Amazon -->
+            <div id="storeCard-amazon" class="store-amazon bg-gray-900/70 border border-gray-800 rounded-xl p-5 backdrop-blur-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
+                            <span class="text-orange-400 font-bold text-sm">A</span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-white">Amazon</p>
+                            <p id="storeStatus-amazon" class="text-xs text-gray-500">Waiting for search...</p>
+                        </div>
+                    </div>
+                    <span id="storeBadge-amazon" class="px-2.5 py-0.5 bg-gray-800 text-gray-500 text-xs font-medium rounded-full border border-gray-700">idle</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="storeDot-amazon" class="w-2 h-2 rounded-full bg-gray-600"></span>
+                    <span id="storeCount-amazon" class="text-xs text-gray-600">0 products found</span>
+                </div>
+            </div>
+
+            <!-- Best Buy -->
+            <div id="storeCard-bestbuy" class="store-bestbuy bg-gray-900/70 border border-gray-800 rounded-xl p-5 backdrop-blur-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                            <span class="text-blue-400 font-bold text-sm">B</span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-white">Best Buy</p>
+                            <p id="storeStatus-bestbuy" class="text-xs text-gray-500">Waiting for search...</p>
+                        </div>
+                    </div>
+                    <span id="storeBadge-bestbuy" class="px-2.5 py-0.5 bg-gray-800 text-gray-500 text-xs font-medium rounded-full border border-gray-700">idle</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="storeDot-bestbuy" class="w-2 h-2 rounded-full bg-gray-600"></span>
+                    <span id="storeCount-bestbuy" class="text-xs text-gray-600">0 products found</span>
+                </div>
+            </div>
+
+            <!-- Newegg -->
+            <div id="storeCard-newegg" class="store-newegg bg-gray-900/70 border border-gray-800 rounded-xl p-5 backdrop-blur-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                            <span class="text-red-400 font-bold text-sm">N</span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-white">Newegg</p>
+                            <p id="storeStatus-newegg" class="text-xs text-gray-500">Waiting for search...</p>
+                        </div>
+                    </div>
+                    <span id="storeBadge-newegg" class="px-2.5 py-0.5 bg-gray-800 text-gray-500 text-xs font-medium rounded-full border border-gray-700">idle</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="storeDot-newegg" class="w-2 h-2 rounded-full bg-gray-600"></span>
+                    <span id="storeCount-newegg" class="text-xs text-gray-600">0 products found</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== FILTERS & SORT BAR ====== -->
+        <div id="controlsBar" class="hidden mb-6 slide-down">
+            <div class="flex flex-wrap items-center gap-4 bg-gray-900/80 border border-gray-800 rounded-xl p-4">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <span class="text-sm text-gray-400 font-medium">Stores:</span>
+                    <label class="flex items-center gap-1.5 cursor-pointer group">
+                        <input type="checkbox" id="filterAmazon" checked class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-orange-500 focus:ring-orange-500 cursor-pointer">
+                        <span class="text-sm text-gray-300 group-hover:text-white transition-colors">Amazon</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer group">
+                        <input type="checkbox" id="filterBestBuy" checked class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 cursor-pointer">
+                        <span class="text-sm text-gray-300 group-hover:text-white transition-colors">Best Buy</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer group">
+                        <input type="checkbox" id="filterNewegg" checked class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-red-500 focus:ring-red-500 cursor-pointer">
+                        <span class="text-sm text-gray-300 group-hover:text-white transition-colors">Newegg</span>
+                    </label>
+                </div>
+                <div class="flex items-center gap-2 ml-auto">
+                    <span class="text-sm text-gray-400 font-medium">Sort:</span>
+                    <select id="sortSelect" class="px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm focus:outline-none focus:border-blue-500 cursor-pointer">
+                        <option value="best-match">Best Match</option>
+                        <option value="price-low">Price: Low to High</option>
+                        <option value="price-high">Price: High to Low</option>
+                        <option value="rating">Highest Rated</option>
+                        <option value="reviews">Most Reviews</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== LOADING STATE ====== -->
+        <div id="loadingContainer" class="hidden text-center py-16 fade-in">
+            <div class="spinner"></div>
+            <p class="text-gray-400 mt-5 text-lg" id="loadingText">Searching stores...</p>
+            <div class="mt-6 flex justify-center gap-6">
+                <div class="flex items-center gap-2 text-sm" id="sourceAmazon">
+                    <span class="w-2.5 h-2.5 rounded-full bg-gray-600"></span>
+                    <span class="text-gray-500">Amazon</span>
+                </div>
+                <div class="flex items-center gap-2 text-sm" id="sourceBestBuy">
+                    <span class="w-2.5 h-2.5 rounded-full bg-gray-600"></span>
+                    <span class="text-gray-500">Best Buy</span>
+                </div>
+                <div class="flex items-center gap-2 text-sm" id="sourceNewegg">
+                    <span class="w-2.5 h-2.5 rounded-full bg-gray-600"></span>
+                    <span class="text-gray-500">Newegg</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== ERROR STATE ====== -->
+        <div id="errorContainer" class="hidden text-center py-16 fade-in">
+            <div class="w-16 h-16 mx-auto mb-5 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-red-400 mb-2">Search Failed</h2>
+            <p class="text-gray-400 mb-6 max-w-md mx-auto" id="errorMessage">Could not reach the product finder API.</p>
+            <div class="flex items-center justify-center gap-3">
+                <button id="retryBtn" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold transition-all text-sm">Retry Search</button>
+                <button id="resetBtn" class="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-xl font-semibold transition-all text-sm text-gray-300 border border-gray-700">Back to Start</button>
+            </div>
+        </div>
+
+        <!-- ====== EMPTY STATE ====== -->
+        <div id="emptyContainer" class="hidden text-center py-16 fade-in">
+            <div class="w-16 h-16 mx-auto mb-5 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center">
+                <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-300 mb-2">No Products Found</h2>
+            <p class="text-gray-500 mb-6 max-w-md mx-auto" id="emptyMessage">Try a different search term like "RTX 5090", "MacBook Pro", or "gaming keyboard".</p>
+            <div class="flex flex-wrap justify-center gap-2">
+                <span class="chip px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-full text-xs text-gray-400 hover:border-gray-500" data-suggestion="RTX 5090">RTX 5090</span>
+                <span class="chip px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-full text-xs text-gray-400 hover:border-gray-500" data-suggestion="MacBook Pro">MacBook Pro</span>
+                <span class="chip px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-full text-xs text-gray-400 hover:border-gray-500" data-suggestion="gaming keyboard">gaming keyboard</span>
+            </div>
+        </div>
+
+        <!-- ====== ERROR BANNERS (per-store) ====== -->
+        <div id="errorBanners" class="hidden mb-4 space-y-2"></div>
+
+        <!-- ====== RESULTS ====== -->
         <div id="resultsContainer" class="hidden">
-            <div id="bestPickCard" class="relative bg-gray-800 rounded-lg p-6 mb-8 border-2 border-yellow-500">
-                <div class="absolute top-0 left-0 bg-yellow-500 text-gray-900 px-4 py-1 rounded-br-lg font-bold text-sm">BEST PICK</div>
+            <!-- Result metadata -->
+            <div id="resultMeta" class="text-sm text-gray-500 mb-5 flex flex-wrap items-center gap-3"></div>
+
+            <!-- Best Pick -->
+            <div id="bestPickCard" class="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 mb-8 border-2 border-yellow-500/60 fade-in best-pick-glow">
+                <div class="absolute top-0 left-0 bg-gradient-to-r from-yellow-500 to-yellow-400 text-gray-900 px-5 py-1.5 rounded-br-xl font-extrabold text-sm tracking-wide flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    BEST PICK
+                </div>
                 <div id="bestPickContent" class="mt-4"></div>
             </div>
-            <div id="productGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+
+            <!-- Product Grid -->
+            <div id="productGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
         </div>
-    </div>
+    </main>
+
+    <!-- ====== FOOTER ====== -->
+    <footer class="border-t border-gray-800/50 py-6 mt-8">
+        <div class="max-w-7xl mx-auto px-4 flex flex-wrap items-center justify-between gap-4 text-xs text-gray-600">
+            <div class="flex items-center gap-4">
+                <span>Product Finder v1.0</span>
+                <span class="w-1 h-1 rounded-full bg-gray-700"></span>
+                <span class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                    API <span id="apiStatus">checking...</span>
+                </span>
+            </div>
+            <div class="flex items-center gap-4">
+                <span>Powered by Express + Tailwind</span>
+                <span class="w-1 h-1 rounded-full bg-gray-700"></span>
+                <span id="lastSearchTime" class="text-gray-700">No searches yet</span>
+            </div>
+        </div>
+    </footer>
+
     <script>
+        var API_BASE = 'http://localhost:3001';
+        var lastQuery = '';
+        var lastRawData = null;
+
+        // ====== Stars ======
         function renderStars(rating) {
             var full = Math.floor(rating);
             var half = rating - full >= 0.5 ? 1 : 0;
@@ -105,79 +321,354 @@
             return html;
         }
 
+        function getSourceBadgeClass(source) {
+            if (source === 'Amazon') return 'bg-orange-600';
+            if (source === 'Best Buy') return 'bg-blue-600';
+            return 'bg-red-600';
+        }
+
+        // ====== Card Builder ======
+        function buildCardHtml(p, isBestPick) {
+            var sourceBadge = '<span class="px-2.5 py-0.5 rounded-full text-white text-xs font-bold ' + getSourceBadgeClass(p.source) + '">' + p.source + '</span>';
+            var badges = (p.badges || []).map(function(b) {
+                return '<span class="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs font-bold rounded border border-yellow-500/30">' + b + '</span>';
+            }).join('');
+
+            if (isBestPick) {
+                return '<div class="flex flex-wrap items-center gap-2 mb-4">' +
+                    sourceBadge + badges +
+                    '</div>' +
+                    '<div class="flex flex-wrap gap-6">' +
+                        (p.imageUrl ? '<div class="flex-shrink-0"><img src="' + p.imageUrl + '" alt="' + p.name.replace(/"/g,'&quot;') + '" class="w-36 h-36 object-contain rounded-xl bg-gray-800/50 p-2 border border-gray-700/50" onerror="this.style.display=\'none\'"></div>' : '') +
+                        '<div class="flex-1 min-w-[220px]">' +
+                            '<h2 class="text-xl md:text-2xl font-bold mb-3 leading-tight">' + p.name + '</h2>' +
+                            '<p class="text-3xl md:text-4xl font-bold text-green-400 mb-3">$' + Math.round(p.price) + '</p>' +
+                            '<div class="flex flex-wrap items-center gap-3 mb-2">' +
+                                '<span class="text-lg">' + renderStars(p.rating) + '</span>' +
+                                '<span class="text-gray-300 font-semibold">' + (p.rating || 0).toFixed(1) + '</span>' +
+                            '</div>' +
+                            '<p class="text-gray-400 text-sm mb-4">' + (p.reviews || 0).toLocaleString() + ' reviews</p>' +
+                            '<div class="flex flex-wrap items-center gap-3">' +
+                                '<div class="inline-flex items-center gap-2 bg-gray-800/80 px-3 py-2 rounded-lg border border-gray-700/50">' +
+                                    '<span class="text-xs text-gray-400">Score:</span>' +
+                                    '<span class="text-sm font-bold text-white">' + (p.combinedScore || 0).toFixed(1) + ' / 100</span>' +
+                                '</div>' +
+                                (p.url ? '<a href="' + p.url + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-base font-bold transition-all shadow-lg shadow-blue-900/30">View on ' + p.source + ' <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>' : '') +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+            }
+
+            return '<div class="flex flex-wrap items-center gap-2 mb-3">' +
+                sourceBadge + badges +
+                '</div>' +
+                '<div class="flex flex-col sm:flex-row gap-4">' +
+                    (p.imageUrl ? '<div class="flex-shrink-0"><img src="' + p.imageUrl + '" alt="' + p.name.replace(/"/g,'&quot;') + '" class="w-20 h-20 object-contain rounded-lg bg-gray-800/50 p-1 border border-gray-700/30" onerror="this.style.display=\'none\'"></div>' : '') +
+                    '<div class="flex-1 min-w-0">' +
+                        '<h3 class="text-base font-semibold mb-2 truncate" title="' + p.name.replace(/"/g,'&quot;') + '">' + p.name + '</h3>' +
+                        '<p class="text-2xl font-bold text-green-400 mb-2">$' + Math.round(p.price) + '</p>' +
+                        '<div class="flex items-center gap-2 mb-1">' +
+                            '<span class="text-sm">' + renderStars(p.rating) + '</span>' +
+                            '<span class="text-gray-300 text-xs">' + (p.rating || 0).toFixed(1) + '</span>' +
+                        '</div>' +
+                        '<p class="text-gray-400 text-xs mb-3">' + (p.reviews || 0).toLocaleString() + ' reviews</p>' +
+                        '<div class="w-full bg-gray-800 rounded-full h-1.5 mb-1 overflow-hidden">' +
+                            '<div class="score-bar bg-gradient-to-r from-blue-500 to-blue-400 h-1.5 rounded-full" style="--score-width:' + Math.min(100, Math.max(0, p.combinedScore || 0)) + '%"></div>' +
+                        '</div>' +
+                        '<p class="text-xs text-gray-500">Score: ' + (p.combinedScore || 0).toFixed(1) + ' / 100</p>' +
+                        (p.url ? '<a href="' + p.url + '" target="_blank" rel="noopener" class="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-semibold transition-all">View on ' + p.source + ' <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>' : '') +
+                    '</div>' +
+                '</div>';
+        }
+
+        // ====== Ranking Engine ======
+        window.RankingEngine = {
+          rankProducts: function(products) {
+            if (!Array.isArray(products) || products.length === 0) return [];
+            var data = products.map(function(p) { return { ...p, _price: Number(p.price) || 0, _rating: Number(p.rating) || 0, _reviews: Number(p.reviews) || 0 }; });
+            var prices = data.map(function(d) { return d._price; });
+            var valueRaws = data.map(function(d) { return (d._rating / (d._price || 1)) * 1000; });
+            var reviewRaws = data.map(function(d) { return Math.log(d._reviews || 1); });
+            var minPrice = Math.min.apply(null, prices), maxPrice = Math.max.apply(null, prices);
+            var minValue = Math.min.apply(null, valueRaws), maxValue = Math.max.apply(null, valueRaws);
+            var minReview = Math.min.apply(null, reviewRaws), maxReview = Math.max.apply(null, reviewRaws);
+            var round1 = function(n) { return Math.round(n * 10) / 10; };
+            var computed = data.map(function(d, i) {
+              var priceScore = maxPrice === minPrice ? 100 : ((maxPrice - d._price) / (maxPrice - minPrice)) * 100;
+              var ratingScore = (d._rating / 5) * 100;
+              var valueScore = maxValue === minValue ? 100 : ((valueRaws[i] - minValue) / (maxValue - minValue)) * 100;
+              var reviewScore = maxReview === minReview ? 100 : ((reviewRaws[i] - minReview) / (maxReview - minReview)) * 100;
+              return { product: d, priceScore: round1(priceScore), ratingScore: round1(ratingScore), valueScore: round1(valueScore), reviewScore: round1(reviewScore), combinedScore: round1((priceScore * 0.5 + ratingScore * 1.0 + valueScore * 1.0 + reviewScore * 1.5) / 4) };
+            });
+            var maxPriceScore = Math.max.apply(null, computed.map(function(c) { return c.priceScore; }));
+            var maxRatingScore = Math.max.apply(null, computed.map(function(c) { return c.ratingScore; }));
+            var maxValueScore = Math.max.apply(null, computed.map(function(c) { return c.valueScore; }));
+            var maxReviewScore = Math.max.apply(null, computed.map(function(c) { return c.reviewScore; }));
+            var maxCombined = Math.max.apply(null, computed.map(function(c) { return c.combinedScore; }));
+            var result = computed.map(function(c) {
+              var badges = [];
+              if (c.priceScore === maxPriceScore) badges.push("BEST PRICE");
+              if (c.product.rating >= 4.5) badges.push("TOP RATED");
+              if (c.valueScore === maxValueScore) badges.push("BEST VALUE");
+              if (c.reviewScore === maxReviewScore) badges.push("MOST REVIEWS");
+              if (c.combinedScore === maxCombined) badges.push("BEST PICK");
+              var rest = {};
+              for (var k in c.product) {
+                if (k !== '_price' && k !== '_rating' && k !== '_reviews') rest[k] = c.product[k];
+              }
+              rest.combinedScore = c.combinedScore;
+              rest.badges = badges;
+              return rest;
+            });
+            result.sort(function(a, b) { return b.combinedScore - a.combinedScore; });
+            return result;
+          }
+        };
+
+        // ====== Render ======
         function renderProducts(rankedProducts) {
             var grid = document.getElementById('productGrid');
             grid.innerHTML = '';
-            if (!rankedProducts || rankedProducts.length === 0) {
-                document.getElementById('resultsContainer').classList.add('hidden');
-                return;
-            }
+            if (!rankedProducts || rankedProducts.length === 0) return;
+
             var bestPick = rankedProducts[0];
-            var bestPickContent = document.getElementById('bestPickContent');
-            var sourceBadgeClass = bestPick.source === 'Amazon' ? 'bg-orange-600' : (bestPick.source === 'Best Buy' ? 'bg-blue-600' : 'bg-red-600');
-            bestPickContent.innerHTML =
-                '<div class="flex flex-wrap items-center gap-3 mb-3">' +
-                    '<span class="px-3 py-1 rounded-full text-white text-sm font-bold ' + sourceBadgeClass + '">' + bestPick.source + '</span>' +
-                    (bestPick.badges || []).map(function(b) { return '<span class="px-2 py-1 bg-yellow-500 text-gray-900 text-xs font-bold rounded">' + b + '</span>'; }).join('') +
-                '</div>' +
-                '<h2 class="text-2xl md:text-3xl font-bold mb-2">' + bestPick.name + '</h2>' +
-                '<p class="text-3xl md:text-4xl font-bold text-green-400 mb-3">$' + Math.round(bestPick.price) + '</p>' +
-                '<div class="flex flex-wrap items-center gap-3 mb-2">' +
-                    '<span class="text-xl">' + renderStars(bestPick.rating) + '</span>' +
-                    '<span class="text-gray-300 font-semibold">' + bestPick.rating.toFixed(1) + '</span>' +
-                '</div>' +
-                '<p class="text-gray-400 mb-4">' + bestPick.reviews.toLocaleString() + ' reviews</p>' +
-                '<div class="inline-flex items-center gap-2 bg-gray-700 px-3 py-2 rounded-lg">' +
-                    '<span class="text-sm text-gray-300">Score:</span>' +
-                    '<span class="text-sm font-bold text-white">' + bestPick.combinedScore.toFixed(1) + ' / 100</span>' +
-                '</div>';
+            document.getElementById('bestPickContent').innerHTML = buildCardHtml(bestPick, true);
 
             for (var i = 1; i < rankedProducts.length; i++) {
-                (function(p) {
+                (function(p, idx) {
                     var card = document.createElement('div');
-                    card.className = 'bg-gray-800 rounded-lg p-5 border border-gray-700';
-                    var sourceBadgeClass = p.source === 'Amazon' ? 'bg-orange-600' : (p.source === 'Best Buy' ? 'bg-blue-600' : 'bg-red-600');
-                    card.innerHTML =
-                        '<div class="flex flex-wrap items-center gap-2 mb-3">' +
-                            '<span class="px-2 py-1 rounded-full text-white text-xs font-bold ' + sourceBadgeClass + '">' + p.source + '</span>' +
-                            (p.badges || []).map(function(b) { return '<span class="px-2 py-1 bg-yellow-500 text-gray-900 text-xs font-bold rounded">' + b + '</span>'; }).join('') +
-                        '</div>' +
-                        '<h3 class="text-lg font-semibold mb-2">' + p.name + '</h3>' +
-                        '<p class="text-2xl font-bold text-green-400 mb-2">$' + Math.round(p.price) + '</p>' +
-                        '<div class="flex items-center gap-2 mb-1">' +
-                            '<span class="text-base">' + renderStars(p.rating) + '</span>' +
-                            '<span class="text-gray-300 text-sm">' + p.rating.toFixed(1) + '</span>' +
-                        '</div>' +
-                        '<p class="text-gray-400 text-sm mb-3">' + p.reviews.toLocaleString() + ' reviews</p>' +
-                        '<div class="w-full bg-gray-700 rounded-full h-2 mb-1">' +
-                            '<div class="bg-blue-500 h-2 rounded-full" style="width:' + Math.min(100, Math.max(0, p.combinedScore)) + '%"></div>' +
-                        '</div>' +
-                        '<p class="text-xs text-gray-400">Score: ' + p.combinedScore.toFixed(1) + ' / 100</p>';
+                    card.className = 'product-card bg-gray-900/70 border border-gray-800 rounded-xl p-5 fade-in';
+                    card.style.animationDelay = (idx * 0.06) + 's';
+                    card.innerHTML = buildCardHtml(p, false);
                     grid.appendChild(card);
-                })(rankedProducts[i]);
+                })(rankedProducts[i], i - 1);
             }
         }
 
-        document.getElementById('searchBtn').addEventListener('click', function() {
-            var query = document.getElementById('searchInput').value.trim();
+        // ====== Sort & Filter ======
+        function applySortAndFilter(products, sortBy, activeSources) {
+            var filtered = products.filter(function(p) {
+                return activeSources.indexOf(p.source) !== -1;
+            });
+            switch (sortBy) {
+                case 'price-low':  filtered.sort(function(a,b) { return (a.price||0) - (b.price||0); }); break;
+                case 'price-high': filtered.sort(function(a,b) { return (b.price||0) - (a.price||0); }); break;
+                case 'rating':     filtered.sort(function(a,b) { return (b.rating||0) - (a.rating||0); }); break;
+                case 'reviews':    filtered.sort(function(a,b) { return (b.reviews||0) - (a.reviews||0); }); break;
+            }
+            return filtered;
+        }
+
+        // ====== State Helpers ======
+        function hideAllStates() {
+            ['loadingContainer','errorContainer','emptyContainer','resultsContainer','errorBanners','controlsBar'].forEach(function(id) {
+                document.getElementById(id).classList.add('hidden');
+            });
+        }
+
+        function setSourceStatus(source, status) {
+            var el = document.getElementById('source' + source);
+            if (!el) return;
+            var dot = el.querySelector('span');
+            if (status === 'loading')  dot.className = 'w-2.5 h-2.5 rounded-full bg-yellow-400 pulse-dot';
+            else if (status === 'done') dot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
+            else if (status === 'error') dot.className = 'w-2.5 h-2.5 rounded-full bg-red-400';
+            else dot.className = 'w-2.5 h-2.5 rounded-full bg-gray-600';
+        }
+
+        function setStoreState(sourceId, status, count) {
+            var dot = document.getElementById('storeDot-' + sourceId);
+            var badge = document.getElementById('storeBadge-' + sourceId);
+            var statusText = document.getElementById('storeStatus-' + sourceId);
+            var countEl = document.getElementById('storeCount-' + sourceId);
+            var card = document.getElementById('storeCard-' + sourceId);
+
+            if (status === 'loading') {
+                dot.className = 'w-2 h-2 rounded-full bg-yellow-400 pulse-dot';
+                badge.textContent = 'searching';
+                badge.className = 'px-2.5 py-0.5 bg-yellow-500/10 text-yellow-400 text-xs font-medium rounded-full border border-yellow-500/30';
+                statusText.textContent = 'Searching...';
+                card.style.borderColor = '';
+            } else if (status === 'done') {
+                dot.className = 'w-2 h-2 rounded-full bg-green-400';
+                badge.textContent = 'loaded';
+                badge.className = 'px-2.5 py-0.5 bg-green-500/10 text-green-400 text-xs font-medium rounded-full border border-green-500/30';
+                statusText.textContent = 'Found ' + (count || 0) + ' products';
+                countEl.textContent = (count || 0) + ' products found';
+            } else if (status === 'error') {
+                dot.className = 'w-2 h-2 rounded-full bg-red-400';
+                badge.textContent = 'error';
+                badge.className = 'px-2.5 py-0.5 bg-red-500/10 text-red-400 text-xs font-medium rounded-full border border-red-500/30';
+                statusText.textContent = 'Scrape failed';
+            } else {
+                dot.className = 'w-2 h-2 rounded-full bg-gray-600';
+                badge.textContent = 'idle';
+                badge.className = 'px-2.5 py-0.5 bg-gray-800 text-gray-500 text-xs font-medium rounded-full border border-gray-700';
+                statusText.textContent = 'Waiting for search...';
+                countEl.textContent = '0 products found';
+            }
+        }
+
+        // ====== Search ======
+        function doSearch(query) {
             if (!query) return;
-            var rawProducts = window.MockDataModule.generateProducts(query);
-            var rankedProducts = window.RankingEngine.rankProducts(rawProducts);
-            renderProducts(rankedProducts);
-            document.getElementById('resultsContainer').classList.remove('hidden');
+            lastQuery = query;
+            hideAllStates();
+
+            // Show loading
+            document.getElementById('loadingContainer').classList.remove('hidden');
+            document.getElementById('loadingText').textContent = 'Searching stores for "' + query + '"...';
+            setSourceStatus('Amazon', 'loading');
+            setSourceStatus('BestBuy', 'loading');
+            setSourceStatus('Newegg', 'loading');
+            setStoreState('amazon', 'loading');
+            setStoreState('bestbuy', 'loading');
+            setStoreState('newegg', 'loading');
+
+            fetch(API_BASE + '/api/search?q=' + encodeURIComponent(query), { signal: AbortSignal.timeout(30000) })
+                .then(function(resp) {
+                    if (!resp.ok) throw new Error('Server returned ' + resp.status);
+                    return resp.json();
+                })
+                .then(function(data) {
+                    lastRawData = data;
+
+                    // Store counts
+                    var storeCounts = {};
+                    (data.results || []).forEach(function(p) {
+                        storeCounts[p.source] = (storeCounts[p.source] || 0) + 1;
+                    });
+
+                    // Update store cards
+                    setStoreState('amazon', data.errors && data.errors.amazon ? 'error' : 'done', storeCounts['Amazon'] || 0);
+                    setStoreState('bestbuy', data.errors && data.errors.bestbuy ? 'error' : 'done', storeCounts['Best Buy'] || 0);
+                    setStoreState('newegg', data.errors && data.errors.newegg ? 'error' : 'done', storeCounts['Newegg'] || 0);
+
+                    // Update source dots
+                    setSourceStatus('Amazon', data.errors && data.errors.amazon ? 'error' : 'done');
+                    setSourceStatus('BestBuy', data.errors && data.errors.bestbuy ? 'error' : 'done');
+                    setSourceStatus('Newegg', data.errors && data.errors.newegg ? 'error' : 'done');
+
+                    var products = data.results || [];
+
+                    // Per-store error banners
+                    var errorBanners = document.getElementById('errorBanners');
+                    errorBanners.innerHTML = '';
+                    var hadErrors = false;
+                    if (data.errors) {
+                        var storeLabels = { amazon: 'Amazon', bestbuy: 'Best Buy', newegg: 'Newegg' };
+                        Object.keys(data.errors).forEach(function(key) {
+                            if (data.errors[key]) {
+                                hadErrors = true;
+                                var banner = document.createElement('div');
+                                banner.className = 'error-banner slide-down flex items-center gap-2 px-4 py-2.5 bg-red-900/30 border border-red-800/40 rounded-lg text-sm text-red-300';
+                                banner.innerHTML = '<svg class="w-4 h-4 flex-shrink-0 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> <span>' + storeLabels[key] + ': ' + data.errors[key] + '</span>';
+                                errorBanners.appendChild(banner);
+                            }
+                        });
+                    }
+                    if (hadErrors) errorBanners.classList.remove('hidden');
+
+                    document.getElementById('loadingContainer').classList.add('hidden');
+
+                    if (products.length === 0) {
+                        document.getElementById('emptyContainer').classList.remove('hidden');
+                        document.getElementById('emptyMessage').textContent = 'No products found for "' + query + '". Try a different search term.';
+                        document.getElementById('lastSearchTime').textContent = 'Last search: no results for "' + query + '"';
+                        return;
+                    }
+
+                    // Filter & sort
+                    var activeSources = [];
+                    if (document.getElementById('filterAmazon').checked) activeSources.push('Amazon');
+                    if (document.getElementById('filterBestBuy').checked) activeSources.push('Best Buy');
+                    if (document.getElementById('filterNewegg').checked) activeSources.push('Newegg');
+
+                    var sortBy = document.getElementById('sortSelect').value;
+                    var filtered = applySortAndFilter(products, sortBy, activeSources);
+
+                    if (filtered.length === 0) {
+                        document.getElementById('emptyContainer').classList.remove('hidden');
+                        document.getElementById('emptyMessage').textContent = 'No products from the selected stores. Try adjusting your filters.';
+                        document.getElementById('lastSearchTime').textContent = 'Last search: no filtered results for "' + query + '"';
+                        return;
+                    }
+
+                    var ranked = window.RankingEngine.rankProducts(filtered);
+
+                    document.getElementById('controlsBar').classList.remove('hidden');
+                    document.getElementById('resultsContainer').classList.remove('hidden');
+
+                    // Result meta
+                    var metaParts = ['Found ' + products.length + ' products'];
+                    Object.keys(storeCounts).forEach(function(s) { metaParts.push(storeCounts[s] + ' from ' + s); });
+                    document.getElementById('resultMeta').textContent = metaParts.join(' · ');
+
+                    renderProducts(ranked);
+                    document.getElementById('lastSearchTime').textContent = 'Last search: "' + query + '" — ' + products.length + ' results';
+                })
+                .catch(function(err) {
+                    document.getElementById('loadingContainer').classList.add('hidden');
+                    setStoreState('amazon', 'idle');
+                    setStoreState('bestbuy', 'idle');
+                    setStoreState('newegg', 'idle');
+                    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+                        document.getElementById('errorMessage').textContent = 'The request timed out. The API server may be starting up — try again.';
+                    } else if (err.message.indexOf('Failed to fetch') !== -1 || err.message.indexOf('NetworkError') !== -1) {
+                        document.getElementById('errorMessage').textContent = 'Could not connect to the API server at ' + API_BASE + '. Make sure the backend server is running (npm start in the server/ directory).';
+                    } else {
+                        document.getElementById('errorMessage').textContent = err.message || 'An unknown error occurred.';
+                    }
+                    document.getElementById('errorContainer').classList.remove('hidden');
+                });
+        }
+
+        // ====== Event Listeners ======
+        document.getElementById('searchBtn').addEventListener('click', function() {
+            doSearch(document.getElementById('searchInput').value.trim());
+        });
+        document.getElementById('searchInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') doSearch(e.target.value.trim());
+        });
+        document.getElementById('retryBtn').addEventListener('click', function() {
+            doSearch(lastQuery || document.getElementById('searchInput').value.trim());
+        });
+        document.getElementById('resetBtn').addEventListener('click', function() {
+            hideAllStates();
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchInput').focus();
         });
 
-        document.getElementById('searchInput').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                var query = document.getElementById('searchInput').value.trim();
-                if (!query) return;
-                var rawProducts = window.MockDataModule.generateProducts(query);
-                var rankedProducts = window.RankingEngine.rankProducts(rawProducts);
-                renderProducts(rankedProducts);
-                document.getElementById('resultsContainer').classList.remove('hidden');
-            }
+        // Suggestion chips
+        document.querySelectorAll('[data-suggestion]').forEach(function(el) {
+            el.addEventListener('click', function() {
+                var val = this.getAttribute('data-suggestion');
+                document.getElementById('searchInput').value = val;
+                doSearch(val);
+            });
         });
+
+        // Filter/Sort changes re-trigger search
+        ['filterAmazon','filterBestBuy','filterNewegg','sortSelect'].forEach(function(id) {
+            document.getElementById(id).addEventListener('change', function() {
+                if (lastQuery && !document.getElementById('resultsContainer').classList.contains('hidden')) {
+                    doSearch(lastQuery);
+                }
+            });
+        });
+
+        // ====== API Health Check ======
+        (function checkApi() {
+            fetch(API_BASE + '/api/search?q=healthcheck', { signal: AbortSignal.timeout(3000) })
+                .then(function(r) {
+                    document.getElementById('apiStatus').textContent = r.ok ? 'online' : 'error';
+                    document.getElementById('apiStatus').className = r.ok ? 'text-green-400' : 'text-red-400';
+                })
+                .catch(function() {
+                    document.getElementById('apiStatus').textContent = 'offline';
+                    document.getElementById('apiStatus').className = 'text-red-400';
+                });
+        })();
     </script>
 </body>
 </html>
-

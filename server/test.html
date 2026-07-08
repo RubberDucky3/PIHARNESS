@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API Test Dashboard</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-gray-900 text-white min-h-screen"><div class="max-w-5xl mx-auto px-4 py-8"><h1 class="text-3xl font-bold mb-6">Product Finder — API Test Dashboard</h1><div class="flex gap-2 mb-6"><input type="text" id="q" class="flex-1 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" placeholder="Search query..."><button id="searchBtn" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold">Search</button></div><div id="loading" class="hidden text-center py-8"><p class="text-gray-400">Loading...</p></div><div id="results" class="hidden"><div id="summary" class="grid grid-cols-3 gap-4 mb-6"></div><pre id="rawOutput" class="bg-gray-800 p-4 rounded-lg border border-gray-700 overflow-auto text-sm text-gray-300 max-h-96"></pre></div></div><script>
+let startTime;
+document.getElementById('searchBtn').onclick = async () => {
+  const q = document.getElementById('q').value.trim();
+  if (!q) return;
+  document.getElementById('loading').classList.remove('hidden');
+  document.getElementById('results').classList.add('hidden');
+  startTime = performance.now();
+  try {
+    const resp = await fetch('http://localhost:3001/api/search?q=' + encodeURIComponent(q));
+    const elapsed = Math.round(performance.now() - startTime);
+    const data = await resp.json();
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('results').classList.remove('hidden');
+    document.getElementById('rawOutput').textContent = JSON.stringify(data, null, 2);
+    let summaryHtml = '';
+    const stores = { amazon: 'Amazon', bestbuy: 'Best Buy', newegg: 'Newegg' };
+    Object.keys(stores).forEach(key => {
+      const count = (data.results || []).filter(p => p.source === stores[key]).length;
+      const err = data.errors && data.errors[key];
+      const color = err ? 'bg-red-600' : (count > 0 ? 'bg-green-600' : 'bg-yellow-600');
+      summaryHtml += '<div class="bg-gray-800 rounded-lg p-4 border border-gray-700"><div class="flex items-center justify-between mb-2"><span class="font-semibold">' + stores[key] + '</span><span class="px-2 py-1 text-xs font-bold rounded-full ' + color + '">' + (err ? 'Error' : count + ' results') + '</span></div>' + (err ? '<p class="text-red-400 text-sm">' + err + '</p>' : '<p class="text-green-400 text-sm">OK</p>') + '</div>';
+    });
+    summaryHtml += '<div class="bg-gray-800 rounded-lg p-4 border border-gray-700 col-span-3"><p class="text-sm text-gray-400">Response time: <span class="text-white font-bold">' + elapsed + 'ms</span> | Total results: <span class="text-white font-bold">' + (data.results || []).length + '</span></p></div>';
+    document.getElementById('summary').innerHTML = summaryHtml;
+  } catch (err) {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('results').classList.remove('hidden');
+    document.getElementById('rawOutput').textContent = 'Error: ' + err.message;
+  }
+};
+document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('searchBtn').click(); });
+</script></body></html>
