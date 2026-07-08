@@ -3,13 +3,20 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import TerminalPane from '../components/TerminalPane.vue'
 
 // ── Split tree ──────────────────────────────────────
-// node = { type: 'leaf', id, title }
+// node = { type: 'leaf', id, title, agentLabel?, role?, taskState? }
 //      | { type: 'split', dir: 'row' | 'col', ratio, children: [node, node] }
 
 let nextId = 1
-function makeLeaf() {
+function makeLeaf(meta = {}) {
   const id = nextId++
-  return { type: 'leaf', id, title: `zsh ${id}` }
+  return {
+    type: 'leaf',
+    id,
+    title: `zsh ${id}`,
+    agentLabel: meta.agentLabel || null,
+    role: meta.role || null,
+    taskState: meta.taskState || null,
+  }
 }
 
 const tree = ref(makeLeaf())
@@ -171,6 +178,13 @@ onUnmounted(() => {
         @mousedown="focusedId = leaf.id"
       >
         <div class="pane-bar">
+          <span
+            v-if="leaf.agentLabel"
+            class="agent-chip"
+            :class="leaf.taskState"
+          >
+            {{ leaf.role || leaf.agentLabel }}
+          </span>
           <input
             v-if="editingId === leaf.id"
             class="pane-title-input"
@@ -348,4 +362,16 @@ onUnmounted(() => {
 .pane-body :deep(.terminal-pane) {
   min-height: 0;
 }
+.agent-chip {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--color-surface, #161b22);
+  border: 1px solid var(--color-border, #30363d);
+  color: var(--color-text-secondary, #8b949e);
+  white-space: nowrap;
+}
+.agent-chip.running { border-color: var(--color-success, #3fb950); color: var(--color-success, #3fb950); }
+.agent-chip.waiting { border-color: var(--color-warning, #d29922); color: var(--color-warning, #d29922); }
+.agent-chip.failed { border-color: var(--color-danger, #f85149); color: var(--color-danger, #f85149); }
 </style>

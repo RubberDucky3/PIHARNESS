@@ -10,6 +10,9 @@ const props = defineProps({
   terminalId: { type: String, required: true },
   cmd: { type: String, default: 'zsh' },
   cwd: { type: String, default: undefined },
+  agentLabel: { type: String, default: '' },
+  role: { type: String, default: '' },
+  taskState: { type: String, default: '' },
 })
 
 const emit = defineEmits(['closed'])
@@ -147,14 +150,46 @@ onUnmounted(async () => {
 </script>
 
 <template>
-  <div ref="terminalRef" class="terminal-pane"></div>
+  <div class="terminal-pane-wrapper">
+    <div
+      v-if="agentLabel"
+      class="terminal-agent-badge"
+      :class="taskState"
+    >
+      {{ role || agentLabel }}
+    </div>
+    <div ref="terminalRef" class="terminal-pane"></div>
+  </div>
 </template>
 
 <style scoped>
 .terminal-pane {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   min-height: 200px;
   background: #0d1117;
 }
+.terminal-pane-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.terminal-agent-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  pointer-events: none;
+  background: rgba(13,17,23,0.85);
+  border: 1px solid var(--color-border, #30363d);
+  color: var(--color-text-secondary, #8b949e);
+}
+.terminal-agent-badge.running { border-color: var(--color-success, #3fb950); color: var(--color-success, #3fb950); }
+.terminal-agent-badge.waiting { border-color: var(--color-warning, #d29922); color: var(--color-warning, #d29922); }
+.terminal-agent-badge.failed { border-color: var(--color-danger, #f85149); color: var(--color-danger, #f85149); }
 </style>

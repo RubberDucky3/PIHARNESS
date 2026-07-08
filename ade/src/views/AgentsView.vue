@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 
 const loading = ref(false)
@@ -10,6 +10,24 @@ const sender = ref('ade-ui')
 const busMessages = ref([])
 const sessions = ref([])
 const activeTab = ref('bus')
+
+const parsedBus = computed(() =>
+  busMessages.value.map((line) => {
+    const match = line.match(/^\[(.+?)\]\s+<(.+?)>\s+(.*)$/)
+    return match
+      ? { ts: match[1], sender: match[2], text: match[3] }
+      : { ts: null, sender: null, text: line }
+  })
+)
+
+const parsedSessions = computed(() =>
+  sessions.value.map((text) => {
+    const match = text.match(/^(.*?)\s{2,}(.*?)\s{2,}(.*)$/)
+    return match
+      ? { label: match[1], runtime: match[2], status: match[3] }
+      : { label: text, runtime: '', status: '' }
+  })
+)
 
 async function callTool(name, args = {}) {
   const result = await invoke('ade_mcp_call_tool', {
@@ -122,7 +140,15 @@ onMounted(() => {
         <div v-else-if="error" class="state error">{{ error }}</div>
         <div v-else-if="!busMessages.length" class="state">No messages yet.</div>
         <div v-else class="msg-list">
-          <div v-for="(msg, i) in busMessages" :key="i" class="msg-item">{{ msg }}</div>
+          <div
+            v-for="(msg, i) in parsedBus"
+            :key="i"
+            class="msg-item bus-item"
+          >
+            <span v-if="msg.ts" class="bus-ts">{{ msg.ts }}</span>
+            <span v-if="msg.sender" class="bus-sender">{{ msg.sender }}</span>
+            <span class="bus-text">{{ msg.text }}</span>
+          </div>
         </div>
       </section>
 
@@ -132,7 +158,14 @@ onMounted(() => {
         <div v-else-if="error" class="state error">{{ error }}</div>
         <div v-else-if="!sessions.length" class="state">No active sessions.</div>
         <div v-else class="msg-list">
-          <div v-for="(s, i) in sessions" :key="i" class="msg-item session-item">{{ s }}</div>
+          <div
+            v-for="(s, i) in parsedSessions"
+            :key="i"
+            class="msg-item session-item"
+          >
+            <span class="session-label">{{ s.label }}</span>
+            <span class="session-meta">{{ s.runtime }} · {{ s.status }}</span>
+          </div>
         </div>
       </section>
     </main>
@@ -157,5 +190,11 @@ onMounted(() => {
 .state.error { color:var(--color-danger); }
 .msg-list { display:flex; flex-direction:column; gap:6px; }
 .msg-item { background:var(--color-surface); border:1px solid var(--color-border); border-radius:6px; padding:8px 10px; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:12px; line-height:1.5; }
-.session-item { color:var(--color-primary); }
+.session-item { color:var(--color-primary); display:flex; flex-direction:column; gap:2px; }
+.session-label { font-weight:600; color:var(--color-primary); }
+.session-meta { font-size:11px; color:var(--color-text-secondary); }
+.bus-item { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.bus-ts { font-size:11px; color:var(--color-text-secondary); }
+.bus-sender { font-size:11px; color:var(--color-accent, #58a6ff); }
+.bus-text { color:var(--color-text); }
 </style>
